@@ -1,0 +1,6 @@
+*.swp
+
+*.pkl
+*.txt
+plot_scripts/old/*
+plot_scripts/__pycache__/*
