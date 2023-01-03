@@ -66,11 +66,11 @@ def plotProfiles(listOfPickles, quantity, output=None, final_only=False, colorma
     plt.close(fig)
 
 if __name__ == '__main__':
-  dirname="bondi_multizone_122822_bondi_b"
+  dirname="bondi_multizone_010223_bondi_b_n2b8_0"
   listOfPickles = ['../data_products/'+dirname+'_profiles.pkl']
   plot_dir="../plots/"+dirname
   os.makedirs(plot_dir, exist_ok=True)
 
   for quantity in ['Mdot', 'rho', 'u', 'T', 'u^r', 'u^phi']:
     output = plot_dir+"/profile_"+quantity+".png"
-    plotProfiles(listOfPickles, quantity, output=output, final_only=False)
+    plotProfiles(listOfPickles, quantity, output=output, final_only=True)

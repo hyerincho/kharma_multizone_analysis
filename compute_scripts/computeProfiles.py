@@ -46,12 +46,16 @@ def computeAllProfiles(runName, outPickleName, quantities=['Mdot', 'rho', 'u', '
   """
   Loop through every file of a given run.  Compute profiles, then save a dictionary to a pickle.
   """
-  subFolders = np.array(os.listdir(runName))
-  subFolders = subFolders[:-1] # Hyerin: exclude the last one for now
-  runIndices = np.array([int(name.split('_')[-1]) for name in subFolders])
+  #subFolders = np.array(os.listdir(runName)) # this also reads in readme file
+  subFolders = np.array(glob.glob(runName+"/*/")) # only look for directories
+  runIndices = np.array([int(name.split('_')[-1][:-1]) for name in subFolders])
   order = np.argsort(runIndices)
   subFolders = subFolders[order]
   runIndices = runIndices[order]
+
+  # Hyerin: exclude the last one for now, because it might have crashed and does not have a final output
+  subFolders = subFolders[:-1]
+  runIndices = runIndices[:-1]
 
   #Collect all profiles.  This is a good place to parallelize if desired later.
   profiles = []
