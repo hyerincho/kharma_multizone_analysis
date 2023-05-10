@@ -147,15 +147,17 @@ if __name__ == '__main__':
   '''
 
   # 2b) strong field test
-  #listOfPickles = ['../data_products/'+dirname for dirname in \
-  #    ['bondi_multizone_050123_onezone_bflux0_1e-4_64^3_profiles.pkl', \
-  #    'bondi_multizone_042723_bflux0_1e-4_32^3_profiles.pkl', \
-  #    'bondi_multizone_042723_bflux0_1e-4_64^3_profiles.pkl', \
-  #    'bondi_multizone_050123_bflux0_1e-4_96^3_profiles.pkl', \
-  #    'bondi_multizone_050523_bflux0_1e-4_128^3_n3_noshort_profiles.pkl', \
-  #    'bondi_multizone_050123_bflux0_0_64^3_profiles.pkl']]
-  #listOfLabels = ['n=1', 'n=3_32^3', 'n=3', 'n=3_96^3', 'n=3_128^3', 'HD']
-  #plot_dir = '../plots/050223_strongfield'
+  listOfPickles = ['../data_products/'+dirname for dirname in \
+      ['bondi_multizone_050123_onezone_bflux0_1e-4_64^3_profiles.pkl', \
+      'bondi_multizone_042723_bflux0_1e-4_32^3_profiles.pkl', \
+      'bondi_multizone_042723_bflux0_1e-4_64^3_profiles.pkl', \
+      'bondi_multizone_050123_bflux0_1e-4_96^3_profiles.pkl', \
+      'bondi_multizone_050523_bflux0_1e-4_128^3_n3_noshort_profiles.pkl', \
+      'bondi_multizone_050123_bflux0_0_64^3_profiles.pkl', \
+      'bondi_multizone_050823_bflux0_0_64^3_nojit_profiles.pkl']]
+  listOfLabels = ['n=1', 'n=3_32^3', 'n=3', 'n=3_96^3', 'n=3_128^3', 'HD+jit', 'HD+nojit']
+  n_zones_list = [1, 3, 3, 3, 3, 3, 3]
+  plot_dir = '../plots/050223_strongfield'
 
   # 2c) n=8
   #listOfPickles = ['../data_products/'+dirname for dirname in ['bondi_multizone_050123_bflux0_2e-8_32^3_n8_profiles.pkl', 'bondi_multizone_050123_bflux0_2e-8_32^3_n8_rot_profiles.pkl', 'bondi_multizone_050223_bflux0_2e-8_64^3_n8_profiles.pkl', 'bondi_multizone_050423_bflux0_2e-8_96^3_n8_test_faster_rst_profiles.pkl']] #, 'bondi_multizone_041823_bondi_n8b8_profiles.pkl']]
@@ -163,17 +165,17 @@ if __name__ == '__main__':
   #plot_dir = '../plots/050223_n8'
 
   # 2d) weak field test (n=3)
-  listOfPickles = ['../data_products/'+dirname for dirname in ['bondi_multizone_050123_onezone_bflux0_1e-8_2d_newrs_profiles.pkl', 'bondi_multizone_050123_bflux0_1e-8_2d_newrs_profiles.pkl', 'bondi_multizone_050423_bflux0_1e-8_2d_newrs_no_short_t_out_profiles.pkl']]
-  listOfLabels = ['n=1', 'n=3','n=3_noshort']
-  n_zones_list = [1, 3, 3]
-  plot_dir = '../plots/050223_n=1vsn=3'
+  #listOfPickles = ['../data_products/'+dirname for dirname in ['bondi_multizone_050123_onezone_bflux0_1e-8_2d_newrs_profiles.pkl', 'bondi_multizone_050123_bflux0_1e-8_2d_newrs_profiles.pkl', 'bondi_multizone_050423_bflux0_1e-8_2d_newrs_no_short_t_out_profiles.pkl']]
+  #listOfLabels = ['n=1', 'n=3','n=3_noshort']
+  #n_zones_list = [1, 3, 3]
+  #plot_dir = '../plots/050223_n=1vsn=3'
 
   # colors, linestyles, directory
-  colors = ['k', 'b', 'r','g', 'm', 'c']
-  linestyles=['-',':',':',':',':', ':']
+  colors = ['k', 'b', 'r','g', 'm', 'c', 'y']
+  linestyles=['-',':',':',':',':', '--', ':']
   os.makedirs(plot_dir, exist_ok=True)
 
-  for quantity in ["beta"]:#, 'b', 'abs_u^r', 'Mdot', 'rho', 'u', 'T', 'u^r', 'abs_u^phi', 'abs_u^th']:
+  for quantity in ['abs_u^r', 'Mdot', 'rho', 'u', 'T', 'u^r', 'abs_u^phi', 'abs_u^th']: #"beta"]:#, 'b', 
     #TESTING
     #output = plot_dir+"/profile_"+quantity+".pdf"
     output = None
