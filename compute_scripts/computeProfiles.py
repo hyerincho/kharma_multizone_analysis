@@ -14,7 +14,7 @@ def shellAverage(dump, quantity, imin=0, mass_weight=True):
   #Many quantities we want are already keys, but some are not.  For those, we must come up with our own formula.
   if quantity == 'Mdot':
     #This is the weirdest one.  We won't average ourselves, and we'll use a built-in pyharm function.
-    return pyharm.shell_sum(dump, 'FM')
+    return -pyharm.shell_sum(dump, 'FM')
   if quantity == 'T':
     to_average = dump['u'] / dump['rho'] * (dump['gam']-1)
   else:
@@ -24,6 +24,9 @@ def shellAverage(dump, quantity, imin=0, mass_weight=True):
   volumetric_weight = dump['gdet']
   if mass_weight:
     density = dump['rho']
+  else:
+    #Obviously it isn't, but basically we just want to pretend this doesn't exist.
+    density = 1.0
 
   if dump['n3'] > 1: #3d
     return np.sum(to_average[imin:,:,:] * volumetric_weight * density, axis=(1,2)) / np.sum(volumetric_weight * density, axis=(1,2))
@@ -46,22 +49,21 @@ def computeAllProfiles(runName, outPickleName, quantities=['Mdot', 'rho', 'u', '
   """
   Loop through every file of a given run.  Compute profiles, then save a dictionary to a pickle.
   """
-  #subFolders = np.array(os.listdir(runName)) # this also reads in readme file
-  subFolders = np.array(glob.glob(runName+"/*/")) # only look for directories
+
+  subFolders = np.array([name for name in glob.glob(runName+"/*/") if name.split('/')[-2].split('_')[0] == 'bondi'])
   runIndices = np.array([int(name.split('_')[-1][:-1]) for name in subFolders])
   order = np.argsort(runIndices)
   subFolders = subFolders[order]
   runIndices = runIndices[order]
 
-  # Hyerin: exclude the last one for now, because it might have crashed and does not have a final output
-  subFolders = subFolders[:-1]
-  runIndices = runIndices[:-1]
-
   #Collect all profiles.  This is a good place to parallelize if desired later.
   profiles = []
   radii = []
   for runIndex in runIndices:
-    finalFile = glob.glob(os.path.join(runName, subFolders[runIndex], '*.final.phdf'))[0]
+    try:
+      finalFile = glob.glob(os.path.join(subFolders[runIndex], '*.final.phdf'))[0]
+    except IndexError:
+      finalFile = sorted(glob.glob(os.path.join(subFolders[runIndex], '*.phdf')))[-1]
     print(f"Loading {finalFile}...")
     dump = pyharm.load_dump(os.path.join(finalFile))
     radii.append(dump['r1d'])
@@ -75,6 +77,7 @@ def computeAllProfiles(runName, outPickleName, quantities=['Mdot', 'rho', 'u', '
   D['radii'] = radii
   D['profiles'] = profiles
   D['quantities'] = quantities
+  D['runName'] = runName
 
   with open(outPickleName, 'wb') as openFile:
     pickle.dump(D, openFile, protocol=2)
@@ -82,7 +85,7 @@ def computeAllProfiles(runName, outPickleName, quantities=['Mdot', 'rho', 'u', '
 
 if __name__ == '__main__':
   #Input and output locations.
-  grmhdLocation = '/n/holylfs05/LABS/bhi/Users/hyerincho/grmhd/data'
+  grmhdLocation = '../data'
   dataLocation = '../data_products'
 
   # For example...
@@ -92,4 +95,4 @@ if __name__ == '__main__':
 
   inName = os.path.join(grmhdLocation, run)
   outName = os.path.join(dataLocation, run + '_profiles.pkl')
-  computeAllProfiles(inName, outName)
+  computeAllProfiles(inName, outName, quantities=['Mdot', 'rho', 'u', 'T', 'abs_u^r', 'u^phi', 'u^th', 'u^r','abs_u^th', 'abs_u^phi', 'u^t', 'b', 'inv_beta'])
