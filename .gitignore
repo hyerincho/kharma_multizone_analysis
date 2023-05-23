@@ -5,3 +5,5 @@
 plot_scripts/old/*
 plot_scripts/__pycache__/*
 plots/*
+data
+movies/*

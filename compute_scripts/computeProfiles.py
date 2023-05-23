@@ -94,5 +94,5 @@ if __name__ == '__main__':
   run = sys.argv[1]
 
   inName = os.path.join(grmhdLocation, run)
-  outName = os.path.join(dataLocation, run + '_profiles.pkl')
-  computeAllProfiles(inName, outName, quantities=['Mdot', 'rho', 'u', 'T', 'abs_u^r', 'u^phi', 'u^th', 'u^r','abs_u^th', 'abs_u^phi', 'u^t', 'b', 'inv_beta'])
+  outName = os.path.join(dataLocation, run + '_profiles2.pkl')
+  computeAllProfiles(inName, outName, quantities=['Mdot', 'rho', 'u', 'T', 'abs_u^r', 'u^phi', 'u^th', 'u^r','abs_u^th', 'abs_u^phi', 'u^t', 'b', 'inv_beta', 'beta'])
