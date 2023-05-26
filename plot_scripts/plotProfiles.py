@@ -138,11 +138,11 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
 
 if __name__ == '__main__':
 
-  # 2a) weak field test (n=4)
   '''
+  # 2a) weak field test (n=4)
   listOfPickles = ['../data_products/'+dirname for dirname in ['bondi_multizone_050423_onezone_bflux0_1e-8_2d_n4_profiles.pkl', 'bondi_multizone_050423_bflux0_1e-8_2d_n4_profiles.pkl']]
-  listOfLabels = ['n=1', 'n=3']
-  n_zones_list = [1, 3]
+  listOfLabels = ['n=1', 'n=4']
+  n_zones_list = [1, 4]
   plot_dir = '../plots/050823_weakfield'
   '''
 
@@ -175,8 +175,8 @@ if __name__ == '__main__':
   linestyles=['-',':',':',':',':', '--', ':']
   os.makedirs(plot_dir, exist_ok=True)
 
-  for quantity in ['abs_u^r', 'Mdot', 'rho', 'u', 'T', 'u^r', 'abs_u^phi', 'abs_u^th']: #"beta"]:#, 'b', 
+  for quantity in ['abs_u^r', 'Mdot', 'rho', 'u', 'T', 'u^r', 'abs_u^phi', 'abs_u^th', 'b', "beta"]:#
     #TESTING
-    #output = plot_dir+"/profile_"+quantity+".pdf"
-    output = None
+    output = plot_dir+"/profile_"+quantity+".pdf"
+    #output = None
     plotProfiles(listOfPickles, quantity, output=output, cyclesToAverage=1, color_list=colors, linestyle_list=linestyles, label_list=listOfLabels, rescale=False, n_zones_list=n_zones_list, trimZone=True)
