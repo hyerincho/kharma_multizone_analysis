@@ -8,24 +8,29 @@ import pdb
 
 gam= 5./3
 mdot=1.
-rs=np.power(10.,2.5) #1000. # 8. #
+#rs=np.power(10.,2.5) #16 #
 
 n= 1./(gam-1.)
-uc= np.sqrt(mdot/(2.*rs))
-Vc= -np.sqrt(np.power(uc,2.)/(1.-3.*np.power(uc,2)))
-Tc= -n*np.power(Vc,2)/((n+1)*(n*np.power(Vc,2)-1.))
-C1= uc*np.power(rs,2)*np.power(Tc,n)
-C2=np.power(1.+(1.+n)*Tc,2.)*(1.-2.*mdot/rs+np.power(C1,2)/(np.power(rs,4)*np.power(Tc,2*n)))
-uprime=C1/(np.power(rs,2)*np.power(Tc,n))
-C2prime=(-2.*mdot/rs+np.power(uprime,2.))+(2.*(1.+n)*Tc+np.power((1.+n)*Tc,2))*(1.-2.*mdot/rs+np.power(uprime,2))
 
-def get_Tfunc(T,r,C1,C2,n):
+def get_Tfunc(T,r):
     #result = np.power(1.+(1.+n)*T,2.)*(1.-2.*mdot/r+np.power(C1/(np.power(r,2.)*np.power(T,n)),2))-C2
     utemp=C1/(np.power(r,2.)*np.power(T,n))
     result = (-2*mdot/r+np.power(utemp,2))+(2.*(1.+n)*T+np.power((1.+n)*T,2))*(1.-2.*mdot/r+np.power(utemp,2))-C2prime
     return result
 
-def get_T(r, C1, C2, n, ax=None, inflow_sol=True):
+def define_globals(rs_in):
+    global rs, C1, C2, C2prime
+    rs=rs_in
+    uc= np.sqrt(mdot/(2.*rs))
+    Vc= -np.sqrt(np.power(uc,2.)/(1.-3.*np.power(uc,2)))
+    Tc= -n*np.power(Vc,2)/((n+1)*(n*np.power(Vc,2)-1.))
+    C1= uc*np.power(rs,2)*np.power(Tc,n)
+    C2=np.power(1.+(1.+n)*Tc,2.)*(1.-2.*mdot/rs+np.power(C1,2)/(np.power(rs,4)*np.power(Tc,2*n)))
+    uprime=C1/(np.power(rs,2)*np.power(Tc,n))
+    C2prime=(-2.*mdot/rs+np.power(uprime,2.))+(2.*(1.+n)*Tc+np.power((1.+n)*Tc,2))*(1.-2.*mdot/rs+np.power(uprime,2))
+    return rs,C1,C2,C2prime
+
+def get_T(r, ax=None, inflow_sol=True):
     rtol = 1.e-12
     ftol = 1.e-14 #5e-15 #
     Tinf = (np.sqrt(C2)-1.)/(n+1)
@@ -60,21 +65,21 @@ def get_T(r, C1, C2, n, ax=None, inflow_sol=True):
     if ax is not None:
         print("plotting")
         T_arr=np.linspace(Tmin,Tmax,100)
-        ax.plot(T_arr,get_Tfunc(T_arr,r,C1,C2,n),'k:')
+        ax.plot(T_arr,get_Tfunc(T_arr,r),'k:')
         ax.axhline(0)
         ax.set_yscale('symlog')
 
     T0=Tmin
-    f0=get_Tfunc(T0,r,C1,C2,n)
+    f0=get_Tfunc(T0,r)
     T1=Tmax
-    f1=get_Tfunc(T1,r,C1,C2,n)
+    f1=get_Tfunc(T1,r)
 
     if (f0*f1>0):
         print("error")
         return -1
 
     Th = 0.5*(T0+T1)
-    fh = get_Tfunc(Th,r,C1,C2,n)
+    fh = get_Tfunc(Th,r)
 
     epsT= rtol*(Tmin+Tmax)
 
@@ -88,13 +93,15 @@ def get_T(r, C1, C2, n, ax=None, inflow_sol=True):
             f1=fh
 
         Th=(T1-T0)/2.+T0 #(f1*T0-f0*T1)/(f1-f0)
-        fh= get_Tfunc(Th,r,C1,C2,n)
+        fh= get_Tfunc(Th,r)
     
     #print(r, Tmin, Tmax, Th)
     return Th
 
-def get_quantity_for_rarr(rarr,quantity):
-    Tarr=np.array([get_T(r,C1,C2,n) for r in rarr])
+def get_quantity_for_rarr(rarr,quantity,rs=np.power(10.,2.5)):
+    define_globals(rs)
+    Tarr=np.array([get_T(r) for r in rarr])
+    #Tarr=np.array([get_T(r,C1,C2,n) for r in rarr])
     rhoarr=np.power(Tarr,n)
     if quantity=='T':
         return Tarr
@@ -103,6 +110,8 @@ def get_quantity_for_rarr(rarr,quantity):
     elif quantity=='ur' or quantity=='u^r': #
         urarr=C1/(np.power(rarr,2)*np.power(Tarr,n))
         return urarr
+    elif quantity=="Mdot":
+        return C1*4.*np.pi*np.ones(np.shape(rarr))
     elif quantity=='vr':
     #elif quantity=='u^r':
         urarr=C1/(np.power(rarr,2)*np.power(Tarr,n))
@@ -130,7 +139,6 @@ def _main():
         plt.savefig("./temp.png")
     else:
         fig,ax=plt.subplots(1,1,figsize=(8,6))
-        #print(uc,Vc,Tc,C1,C2,C2prime)
         T=get_T(1e8,C1,C2,n,ax,inflow_sol=True)
         rho=np.power(T,n)
         u=rho*T*n
