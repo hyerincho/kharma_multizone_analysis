@@ -50,8 +50,10 @@ def computeAllProfiles(runName, outPickleName, quantities=['Mdot', 'rho', 'u', '
   Loop through every file of a given run.  Compute profiles, then save a dictionary to a pickle.
   """
 
-  subFolders = np.array([name for name in glob.glob(runName+"/*/") if name.split('/')[-2].split('_')[0] == 'bondi'])  #POTENTIALLY CHANGE THIS CONDITION WITH NEW NAMING SCHEME
-  runIndices = np.array([int(name.split('_')[-1][:-1]) for name in subFolders])
+  #subFolders = np.array([name for name in glob.glob(runName+"/*/") if name.split('/')[-2].split('_')[0] == 'bondi'])  #POTENTIALLY CHANGE THIS CONDITION WITH NEW NAMING SCHEME
+  #runIndices = np.array([int(name.split('_')[-1][:-1]) for name in subFolders])
+  subFolders = np.array([name for name in glob.glob(runName+"/*[0-9][0-9][0-9][0-9][0-9]/")])
+  runIndices = np.array([int(name[-6:-1]) for name in subFolders])
   order = np.argsort(runIndices)
   subFolders = subFolders[order]
   runIndices = runIndices[order]
