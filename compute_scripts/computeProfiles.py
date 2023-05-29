@@ -45,29 +45,57 @@ def computeProfileSet(dump, quantities=['Mdot', 'rho', 'u', 'T', 'u^r', 'u^phi']
 
   return output
 
-def computeAllProfiles(runName, outPickleName, quantities=['Mdot', 'rho', 'u', 'T', 'u^r', 'u^phi'], mass_weight=True):
+def computeAllProfiles(runName, outPickleName, quantities=['Mdot', 'rho', 'u', 'T', 'u^r', 'u^phi'], mass_weight=True, final_only=True, onezone_override=False):
   """
   Loop through every file of a given run.  Compute profiles, then save a dictionary to a pickle.
   """
 
-  subFolders = np.array([name for name in glob.glob(runName+"/*/") if name.split('/')[-2].split('_')[0] == 'bondi'])
+  subFolders = np.array([name for name in glob.glob(runName+"/*/") if name.split('/')[-2].split('_')[0] == 'bondi'])  #POTENTIALLY CHANGE THIS CONDITION WITH NEW NAMING SCHEME
   runIndices = np.array([int(name.split('_')[-1][:-1]) for name in subFolders])
   order = np.argsort(runIndices)
   subFolders = subFolders[order]
   runIndices = runIndices[order]
 
   #Collect all profiles.  This is a good place to parallelize if desired later.
-  profiles = []
+  if onezone_override:
+    nzone = 1
+  else:
+    nzone = None
+  r_sonic = None
+  listOfListOfProfiles = []
+  listOfListOfTimes= []
   radii = []
   for runIndex in runIndices:
-    try:
-      finalFile = glob.glob(os.path.join(subFolders[runIndex], '*.final.phdf'))[0]
-    except IndexError:
-      finalFile = sorted(glob.glob(os.path.join(subFolders[runIndex], '*.phdf')))[-1]
-    print(f"Loading {finalFile}...")
-    dump = pyharm.load_dump(os.path.join(finalFile))
+    allFiles = sorted(glob.glob(os.path.join(subFolders[runIndex], '*.phdf')))
+    if final_only:
+      allFiles = [allFiles[-1]]
+    listOfProfiles = []
+    listOfTimes = []
+    radiiForThisAnnulus = None
+    for file in allFiles:
+      print(f"Loading {file}...")
+      dump = pyharm.load_dump(os.path.join(file))
+
+      #Just need these values once for the entire simulation.
+      if nzone is None:
+        nzone = dump['nzone']
+      if r_sonic is None:
+        r_sonic = dump['rs']
+
+      listOfProfiles.append(computeProfileSet(dump, quantities=quantities, mass_weight=mass_weight))
+      listOfTimes.append(pyharm.io.get_dump_time(file))
+
+    #Just need this value once for a given annulus.
     radii.append(dump['r1d'])
-    profiles.append(computeProfileSet(dump, quantities=quantities, mass_weight=mass_weight))
+    listOfListOfProfiles.append(listOfProfiles)
+    listOfListOfTimes.append(listOfTimes)
+
+  #Sometimes one-zone models need to restart and it looks like there were multiple zones by the directory structure.
+  #In this case, merge all zones.
+  if onezone_override:
+    listOfListOfProfiles = [[item for sublist in listOfListOfProfiles for item in sublist]]
+    listOfListOfTimes = [[item for sublist in listOfListOfTimes for item in sublist]]
+    radii = [radii[0]] 
 
   #Create a dictionary to save.
   D = {}
@@ -75,9 +103,12 @@ def computeAllProfiles(runName, outPickleName, quantities=['Mdot', 'rho', 'u', '
   D['runIndices'] = runIndices
   D['folders'] = subFolders
   D['radii'] = radii
-  D['profiles'] = profiles
   D['quantities'] = quantities
   D['runName'] = runName
+  D['nzone'] = nzone
+  D['profiles'] = listOfListOfProfiles
+  D['times'] = listOfListOfTimes
+  D['r_sonic'] = r_sonic
 
   with open(outPickleName, 'wb') as openFile:
     pickle.dump(D, openFile, protocol=2)
@@ -94,5 +125,5 @@ if __name__ == '__main__':
   run = sys.argv[1]
 
   inName = os.path.join(grmhdLocation, run)
-  outName = os.path.join(dataLocation, run + '_profiles2.pkl')
-  computeAllProfiles(inName, outName, quantities=['Mdot', 'rho', 'u', 'T', 'abs_u^r', 'u^phi', 'u^th', 'u^r','abs_u^th', 'abs_u^phi', 'u^t', 'b', 'inv_beta', 'beta'])
+  outName = os.path.join(dataLocation, run + '_profiles_all.pkl')
+  computeAllProfiles(inName, outName, quantities=['Mdot', 'rho', 'u', 'T', 'abs_u^r', 'u^phi', 'u^th', 'u^r','abs_u^th', 'abs_u^phi', 'u^t', 'b', 'inv_beta', 'beta'], final_only=False, onezone_override=('onezone' in inName))

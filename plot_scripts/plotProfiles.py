@@ -7,8 +7,6 @@ import pickle
 import os
 import pdb
 
-#TODO:  There should be a file in each folder that tells you how many zones there are, and other useful information.
-
 def readQuantity(dictionary, quantity):
 
   invert = False
@@ -20,17 +18,19 @@ def readQuantity(dictionary, quantity):
     except:
       print("inv_beta doesn't exist, so we will stick with beta.")
       quantity_index = dictionary['quantities'].index(quantity)
-    profiles = [profile_list[quantity_index] for profile_list in dictionary['profiles']]
+    profiles = [[list[quantity_index] for list in sublist] for sublist in dictionary['profiles']]
   elif quantity == 'Omega':
     quantity_index_numerator = dictionary['quantities'].index('u^phi')
     quantity_index_denominator = dictionary['quantities'].index('u^t')
-    profiles = [profile_list[quantity_index_numerator]/profile_list[quantity_index_denominator] for profile_list in dictionary['profiles']]
+    numerator_list = [profile_list[quantity_index_numerator] for profile_list in dictionary['profiles']]
+    denominator_list = [profile_list[quantity_index_denominator] for profile_list in dictionary['profiles']]
+    profiles = [[np.array(list[quantity_index_numerator])/np.array(list[quantity_index_denominator]) for list in sublist] for sublist in dictionary['profiles']]
   else:
     quantity_index = dictionary['quantities'].index(quantity)
-    profiles = [profile_list[quantity_index] for profile_list in dictionary['profiles']]
+    profiles = [[list[quantity_index] for list in sublist] for sublist in dictionary['profiles']]
   return profiles, invert
 
-def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_list=None, linestyle_list=None, figsize=(8,6), n_zones_list=[7], flip_sign=False, show_divisions=True,
+def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_list=None, linestyle_list=None, figsize=(8,6), flip_sign=False, show_divisions=True, zone_time_average_fraction=0, 
   xlabel=None, ylabel=None, xlim=None, ylim=None, label_list=None, fig_ax=None, formatting=True, finish=True, rescale=False, rescale_radius=10, rescale_value=1, cycles_to_average=1, trim_zone=True):
 
   if isinstance(listOfPickles, str):
@@ -55,13 +55,13 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
   #Profiles are pre-computed.
   #See ../compute_scripts/computeProfiles.py for how this file is formatted.
 
-  for run_index in range(len(listOfPickles)):
-    with open(listOfPickles[run_index], 'rb') as openFile:
+  for sim_index in range(len(listOfPickles)):
+    with open(listOfPickles[sim_index], 'rb') as openFile:
       D = pickle.load(openFile)
 
     radii = D['radii']
     #Formula that produces the zone number of a given run.  It would have been better to have this in some other file though.
-    n_zones = n_zones_list[run_index]
+    n_zones = D['nzone']
     if n_zones > 1:
       zone_number_sequence = np.array([np.abs(np.abs(n_zones-1 - (i % (2*n_zones-2)))-(n_zones-1)) for i in range(len(radii))])
     else:
@@ -85,26 +85,41 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
           #Tricky edge case: there are half as many instances of the zones at the ends.
           cycles_to_average = int(np.ceil(cycles_to_average/2))
         indicesToAverage = matchingIndices[-np.min([len(matchingIndices),cycles_to_average]):]
-        finalMatchingIndex = indicesToAverage[-1]
-        n_radii = len(radii[finalMatchingIndex])
-        plottable = np.zeros(n_radii)
 
-        #Time average over some number of cycles.
-        for indexToAverage in indicesToAverage:
-          plottable += np.squeeze(profiles[indexToAverage])
-        plottable /= len(indicesToAverage)
+        #Before moving on, we're going to average profiles within each individual run.
+        selectedProfiles = [profiles[i] for i in indicesToAverage]
+        selectedProfileTimes = [D['times'][i] for i in indicesToAverage]
+        usableProfiles = []
+        for run_index in range(len(selectedProfiles)):
+          t = selectedProfileTimes[run_index]
+          delt = np.gradient(t)
+          averaging_mask = t >= t[-1] - (t[-1]-t[0])*zone_time_average_fraction
+
+          #Always include the last snapshot. Specify this with zone_time_average_fraction == 0.
+          if np.sum(averaging_mask) == 0:
+            averaging_mask[-1] = True
+
+          #An average, taking care to weight different timesteps appropriately.  There's an annoying squeeze and transpose here.
+          integrand = np.transpose(np.squeeze(np.array(selectedProfiles[run_index]))[averaging_mask])
+          usableProfiles.append(np.sum(integrand*delt[averaging_mask], axis=1) / np.sum(delt[averaging_mask]))
+
+        #Now, given an average within each run, average each separate run.
+        plottable = np.mean(usableProfiles, axis=0)
 
         #Flip the quantity upside-down, usually for inv_beta.
         if invert:
           plottable = 1.0 / plottable
 
         #Next, optionally mask out regions that likely have wall glitches by only taking the central half of the radii
+        finalMatchingIndex = indicesToAverage[-1]
+        n_radii = len(radii[finalMatchingIndex])
         mask = np.full(n_radii, True, dtype=bool)
-        if trim_zone:
-          if zone > 0:
-            mask[-int(n_radii/4):] = False
-          if zone < n_zones - 1:
-            mask[:int(n_radii/4)] = False
+        if n_zones > 1:
+          if trim_zone:
+            if zone > 0:
+              mask[-int(n_radii/4):] = False
+            if zone < n_zones - 1:
+              mask[:int(n_radii/4)] = False
 
         r_plot = np.concatenate([r_plot,radii[finalMatchingIndex][mask]])
         values_plot = np.concatenate([values_plot,rescalingFactor*plottable[mask]*(-1)**int(flip_sign)])
@@ -112,8 +127,10 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
       r_plot = np.squeeze(np.array(r_plot))
       values_plot = np.squeeze(np.array(values_plot))
       order = np.argsort(r_plot)
-      ax.plot(r_plot[order], values_plot[order], color=color_list[run_index], ls=linestyle_list[run_index], lw=2)
+      ax.plot(r_plot[order], values_plot[order], color=color_list[sim_index], ls=linestyle_list[sim_index], lw=2)
     else:
+      #DEPRECATED:  Probably will not run.
+
       #Plot every iteration of a given run.  Recommended for examining a single run.  Rescaling not supported because you may be asked to interpolate outside the zone.
       for zone in range(n_profiles):
         valuesToColors = plt.cm.get_cmap(colormap)
@@ -121,7 +138,7 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
         plottable = profiles[finalMatchingIndex]
         if invert:
           plottable = 1.0 / plottable
-        ax.plot(radii[zone], plottable*(-1)**int(flip_sign), color=color, ls=linestyle_list[run_index], lw=2)
+        ax.plot(radii[zone], plottable*(-1)**int(flip_sign), color=color, ls=linestyle_list[sim_index], lw=2)
 
   #Formatting
   if formatting:
@@ -135,8 +152,8 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
       ax.set_yscale('log')
       ax.set_xlim(xlim)
       ax.set_ylim(ylim)
-    for run_index in range(len(listOfPickles)):
-      ax.plot([], [], color=color_list[run_index], lw=2, label=label_list[run_index], ls=linestyle_list[run_index])
+    for sim_index in range(len(listOfPickles)):
+      ax.plot([], [], color=color_list[sim_index], lw=2, label=label_list[sim_index], ls=linestyle_list[sim_index])
       ax.legend(loc='best', frameon=False)
       fig.tight_layout()
     if show_divisions:
@@ -151,9 +168,13 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
   # Bondi analytic overplotting
   xlim = ax.get_xlim()
   r_bondi = np.logspace(np.log10(xlim[0]), np.log10(xlim[1]), 50)
-  analytic_sol = bondi.get_quantity_for_rarr(r_bondi,quantity,rs=16) # TODO: update this rs from pickle
+  try:
+    r_sonic = D["r_sonic"]
+  except:
+    r_sonic = np.sqrt(1e5)
+  analytic_sol = bondi.get_quantity_for_rarr(r_bondi, quantity, rs=r_sonic)
   if analytic_sol is not None:
-    ax.plot(r_bondi, analytic_sol,'k:',label='bondi analytic')
+    ax.plot(r_bondi, analytic_sol, color='slategrey',label='bondi analytic', lw=3, ls='-', zorder=-100)
 
   #Either show or save.
   if finish:
@@ -165,11 +186,19 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
 
 if __name__ == '__main__':
 
+  #TESTING
+  
+  '''
+  listOfPickles = ['../data_products/bondi_multizone_050423_onezone_bflux0_1e-8_2d_n4_profiles_all.pkl']
+  listOfLabels = ['n=1']
+  listOfPickles = ['../data_products/bondi_multizone_050423_bflux0_1e-8_2d_n4_profiles_all.pkl']
+  listOfLabels = ['n=4']
+  '''
+
   # 2a) weak field test (n=4)
-  listOfPickles = ['../data_products/'+dirname for dirname in ['bondi_multizone_050423_onezone_bflux0_1e-8_2d_n4_profiles2.pkl', 'bondi_multizone_050423_bflux0_1e-8_2d_n4_profiles2.pkl']]
+  listOfPickles = ['../data_products/'+dirname for dirname in ['bondi_multizone_050423_onezone_bflux0_1e-8_2d_n4_profiles_all.pkl', 'bondi_multizone_050423_bflux0_1e-8_2d_n4_profiles_all.pkl']]
   listOfLabels = ['n=1', 'n=4']
-  n_zones_list = [1, 4]
-  plot_dir = '../plots/051523_weakfield'
+  plot_dir = '../plots/052623_weakfield'
 
   # 2b) strong field test
   '''
@@ -208,6 +237,7 @@ if __name__ == '__main__':
   os.makedirs(plot_dir, exist_ok=True)
 
   for quantity in ['beta', 'Mdot', 'rho', 'u', 'T', 'abs_u^r', 'abs_u^phi', 'abs_u^th', 'u^r', 'u^phi', 'u^th']: 
-    output = plot_dir+"/profile_"+quantity+".pdf"
-    plotProfiles(listOfPickles, quantity, output=output, cycles_to_average=20, color_list=colors, linestyle_list=linestyles, label_list=listOfLabels, rescale=False, \
-    n_zones_list=n_zones_list, trim_zone=True, flip_sign=(quantity in ['u^r']))
+    #output = plot_dir+"/profile_"+quantity+".pdf"
+    output = None
+    plotProfiles(listOfPickles, quantity, output=output, zone_time_average_fraction=0.5, cycles_to_average=20, color_list=colors, linestyle_list=linestyles, label_list=listOfLabels, rescale=False, \
+    trim_zone=True, flip_sign=(quantity in ['u^r']))

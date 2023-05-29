@@ -124,3 +124,4 @@ do
   fi
 done
 python folderToMovie.py ${odir} ../movies/${ofile}
+rm ${odir}*png
