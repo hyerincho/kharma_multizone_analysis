@@ -31,7 +31,7 @@ def readQuantity(dictionary, quantity):
   return profiles, invert
 
 def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_list=None, linestyle_list=None, figsize=(8,6), flip_sign=False, show_divisions=True, zone_time_average_fraction=0, 
-  xlabel=None, ylabel=None, xlim=None, ylim=None, label_list=None, fig_ax=None, formatting=True, finish=True, rescale=False, rescale_radius=10, rescale_value=1, cycles_to_average=1, trim_zone=True):
+  xlabel=None, ylabel=None, xlim=None, ylim=None, label_list=None, fig_ax=None, formatting=True, finish=True, rescale=False, rescale_radius=10, rescale_value=1, cycles_to_average=1, trim_zone=True, show_gizmo=False):
 
   if isinstance(listOfPickles, str):
     listOfPickles = [listOfPickles]
@@ -143,16 +143,8 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
       order = np.argsort(r_plot)
       ax.plot(r_plot[order], values_plot[order], color=color_list[sim_index], ls=linestyle_list[sim_index], lw=2)
     else:
-      #DEPRECATED:  Probably will not run.
-
-      #Plot every iteration of a given run.  Recommended for examining a single run.  Rescaling not supported because you may be asked to interpolate outside the zone.
-      for zone in range(n_profiles):
-        valuesToColors = plt.cm.get_cmap(colormap)
-        color = valuesToColors(zone/n_profiles)
-        plottable = profiles[finalMatchingIndex]
-        if invert:
-          plottable = 1.0 / plottable
-        ax.plot(radii[zone], plottable*(-1)**int(flip_sign), color=color, ls=linestyle_list[sim_index], lw=2)
+      # HYERIN: split into time chunks
+      ax.plot([],[])
 
   #Formatting
   if formatting:
@@ -166,29 +158,48 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
       ax.set_yscale('log')
       ax.set_xlim(xlim)
       ax.set_ylim(ylim)
+    if show_divisions:
+      divisions = []
+      #for zone in range(n_zones):
+      #  divisions.append(radii[zone][-1])
+      #  if (zone == n_zones-1) | (zone == n_zones-2):
+      #    divisions.append(radii[zone][0])
+      divisions = [8**i for i in range(n_zones+1)]
+      for div in divisions:
+        ax.plot([div]*2, ax.get_ylim(), alpha=0.2, color='grey', lw=1)
+
+  if show_gizmo:
+    dat_gz=np.loadtxt("/n/holylfs05/LABS/bhi/Users/hyerincho/grmhd//data/gizmo/031623_100Myr/dat.txt")
+    r_gizmo=dat_gz[:,0]
+    rho_gizmo = dat_gz[:,1]
+    T_gizmo=dat_gz[:,2]
+    to_plot=None
+    if quantity=='rho':
+      to_plot = rho_gizmo
+    elif quantity=='u':
+      to_plot = T_gizmo*rho_gizmo*3/2
+    elif quantity=='T':
+      to_plot = T_gizmo
+    if to_plot is not None:
+      ax.plot(r_gizmo,to_plot,'b--',lw=3,label='GIZMO')
+  else:
+    # Bondi analytic overplotting
+    xlim = ax.get_xlim()
+    r_bondi = np.logspace(np.log10(xlim[0]), np.log10(xlim[1]), 50)
+    try:
+      r_sonic = D["r_sonic"]
+    except:
+      r_sonic = np.sqrt(1e5)
+    analytic_sol = bondi.get_quantity_for_rarr(r_bondi, quantity, rs=r_sonic)
+    if analytic_sol is not None:
+      ax.plot(r_bondi, analytic_sol, color='slategrey',label='bondi analytic', lw=8, ls=':', zorder=-100,alpha=0.7)
+
+  # legends
+  if formatting:
     for sim_index in range(len(listOfPickles)):
       ax.plot([], [], color=color_list[sim_index], lw=2, label=label_list[sim_index], ls=linestyle_list[sim_index]) # +', t={:.2g}'.format(times_list[sim_index])
       ax.legend(loc='best', frameon=False)
       fig.tight_layout()
-    if show_divisions:
-      divisions = []
-      for zone in range(n_zones):
-        divisions.append(radii[zone][-1])
-        if (zone == n_zones-1) | (zone == n_zones-2):
-          divisions.append(radii[zone][0])
-      for div in divisions:
-        ax.plot([div]*2, ax.get_ylim(), alpha=0.2, color='grey', lw=1)
-
-  # Bondi analytic overplotting
-  xlim = ax.get_xlim()
-  r_bondi = np.logspace(np.log10(xlim[0]), np.log10(xlim[1]), 50)
-  try:
-    r_sonic = D["r_sonic"]
-  except:
-    r_sonic = np.sqrt(1e5)
-  analytic_sol = bondi.get_quantity_for_rarr(r_bondi, quantity, rs=r_sonic)
-  if analytic_sol is not None:
-    ax.plot(r_bondi, analytic_sol, color='slategrey',label='bondi analytic', lw=3, ls='-', zorder=-100)
 
   #Either show or save.
   if finish:
@@ -207,6 +218,26 @@ if __name__ == '__main__':
   listOfLabels = ['n=1']
   listOfPickles = ['../data_products/bondi_multizone_050423_bflux0_1e-8_2d_n4_profiles_all.pkl']
   listOfLabels = ['n=4']
+  '''
+  
+  xlim=None
+  
+  # 1a) Bondi
+  listOfPickles = ['../data_products/bondi_multizone_030723_bondi_128^3_profiles_all.pkl']
+  listOfLabels = [''] #'GIZMO, no extg', 
+  plot_dir = '../plots/052923_bondi'
+  avg_frac=0.
+  cta=1
+  xlim=[2,1e8]
+
+  # 1b&c) GIZMO
+  '''
+  listOfPickles = ['../data_products/production_runs/gizmo_extg_1e8_profiles_all.pkl'] #'../data_products/bondi_multizone_052523_gizmo_n8_64^3_noshock_profiles_all.pkl', 
+  listOfLabels = [''] #'GIZMO, no extg', 
+  plot_dir = '../plots/052923_gizmo'
+  avg_frac=0.5
+  cta=10
+  xlim=[2,4e9]
   '''
 
   # 2a) weak field test (n=4)
@@ -234,11 +265,13 @@ if __name__ == '__main__':
   '''
 
   # 2c) n=8
+  '''
   listOfPickles = ['../data_products/'+dirname for dirname in ['bondi_multizone_050123_bflux0_2e-8_32^3_n8_profiles_all.pkl', 'bondi_multizone_050223_bflux0_2e-8_64^3_n8_profiles_all.pkl', 'bondi_multizone_050423_bflux0_2e-8_96^3_n8_test_faster_rst_profiles_all.pkl', 'production_runs/bondi_bz2e-8_1e8_profiles_all.pkl', '/production_runs/bondi_bz2e-8_1e8_96_profiles_all.pkl']]
   listOfLabels = ['32^3', '64^3', '96^3', '64^3_C', '96^3_C']
   plot_dir = '../plots/052923_n8'
   avg_frac=0.5
   cta=40
+  '''
 
   # 2d) weak field test (n=3)
   '''
@@ -249,12 +282,13 @@ if __name__ == '__main__':
   '''
 
   # colors, linestyles, directory
-  colors = ['k', 'b', 'r', 'g', 'm', 'c', 'y']
-  linestyles=['-',':',':',':',':', '--', ':']
+  colors = ['k','r', 'b',  'g', 'm', 'c', 'y']
+  linestyles=['-','-',':',':',':', '--', ':']
   os.makedirs(plot_dir, exist_ok=True)
 
-  for quantity in ['beta', 'Mdot', 'rho', 'u', 'T', 'abs_u^r', 'abs_u^phi', 'abs_u^th', 'u^r', 'u^phi', 'u^th']: 
+  for quantity in ['Mdot', 'rho', 'u', 'T', 'abs_u^r', 'abs_u^phi', 'abs_u^th', 'u^r', 'u^phi', 'u^th']: #'beta', 
     output = plot_dir+"/profile_"+quantity+".pdf"
     #output = None
+    ylim = [None,[1e-2,10]][(quantity in ['Mdot'])] # [1e-2,10] if Mdot, None otherwise
     plotProfiles(listOfPickles, quantity, output=output, zone_time_average_fraction=avg_frac, cycles_to_average=cta, color_list=colors, linestyle_list=linestyles, label_list=listOfLabels, rescale=False, \
-    trim_zone=True, flip_sign=(quantity in ['u^r']))
+    trim_zone=True, flip_sign=(quantity in ['u^r']), xlim=xlim, ylim=ylim ,show_gizmo=("gizmo" in plot_dir))#, time_chunks=4)
