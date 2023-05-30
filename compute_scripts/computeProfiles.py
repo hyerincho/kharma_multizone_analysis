@@ -111,6 +111,7 @@ def computeAllProfiles(runName, outPickleName, quantities=['Mdot', 'rho', 'u', '
   D['profiles'] = listOfListOfProfiles
   D['times'] = listOfListOfTimes
   D['r_sonic'] = r_sonic
+  D['zone'] = (nzone-1) - int(np.log(dump['r_in'])/np.log(int(dump['base'])))
 
   with open(outPickleName, 'wb') as openFile:
     pickle.dump(D, openFile, protocol=2)
