@@ -57,6 +57,9 @@ def computeAllProfiles(runName, outPickleName, quantities=['Mdot', 'rho', 'u', '
   order = np.argsort(runIndices)
   subFolders = subFolders[order]
   runIndices = runIndices[order]
+  # the arrays that will be used for calculation
+  subFolders_calc = np.copy(subFolders)
+  runIndices_calc = np.copy(runIndices)
 
   #Collect all profiles.  This is a good place to parallelize if desired later.
   if onezone_override:
@@ -64,11 +67,33 @@ def computeAllProfiles(runName, outPickleName, quantities=['Mdot', 'rho', 'u', '
   else:
     nzone = None
   r_sonic = None
+  base = None
   listOfListOfProfiles = []
   listOfListOfTimes= []
   radii = []
-  for runIndex in runIndices:
-    allFiles = sorted(glob.glob(os.path.join(subFolders[runIndex], '*.phdf')))
+  zones = []
+
+  # if file exists, don't do the whole calculation
+  if os.path.isfile(outPickleName):
+    with open(outPickleName, 'rb') as openFile:
+      D_read = pickle.load(openFile)
+    existing_idx = D_read["runIndices"]
+    to_del =[idx for (idx, value) in enumerate(runIndices) if value in existing_idx] # indices to delete
+    if len(set(existing_idx)-set(runIndices_calc))>0:
+      print("WARNING: There are some runs in the pre-existing file that are not present now. This might screw up the calculation.")
+      pdb.set_trace()
+    runIndices_calc = np.delete(runIndices_calc,to_del)
+    subFolders_calc = np.delete(subFolders_calc,to_del)
+    print("file exists for runs {}-{}. starting from {}".format(existing_idx[0], existing_idx[-1], runIndices[0]))
+
+    # override with previously calculated data
+    listOfListOfProfiles = D_read["profiles"]
+    listOfListOfTimes = D_read["times"]
+    radii = D_read["radii"]
+    zones = D_read["zones"]
+
+  for i,runIndex in enumerate(runIndices_calc):
+    allFiles = sorted(glob.glob(os.path.join(subFolders_calc[i], '*.phdf')))
     if final_only:
       allFiles = [allFiles[-1]]
     listOfProfiles = []
@@ -83,18 +108,22 @@ def computeAllProfiles(runName, outPickleName, quantities=['Mdot', 'rho', 'u', '
         nzone = dump['nzone']
       if r_sonic is None:
         r_sonic = dump['rs']
-
+      if base is None:
+        base = int(dump['base'])
+      
       listOfProfiles.append(computeProfileSet(dump, quantities=quantities, mass_weight=mass_weight))
       listOfTimes.append(pyharm.io.get_dump_time(file))
 
     #Just need this value once for a given annulus.
     radii.append(dump['r1d'])
+    zone = (nzone-1) - int(np.log(dump['r_in'])/np.log(base))
+    zones.append(zone)
     listOfListOfProfiles.append(listOfProfiles)
     listOfListOfTimes.append(listOfTimes)
 
   #Sometimes one-zone models need to restart and it looks like there were multiple zones by the directory structure.
   #In this case, merge all zones.
-  if onezone_override:
+  if onezone_override: # HYERIN: I don't know how my new changes have affected this
     listOfListOfProfiles = [[item for sublist in listOfListOfProfiles for item in sublist]]
     listOfListOfTimes = [[item for sublist in listOfListOfTimes for item in sublist]]
     radii = [radii[0]] 
@@ -111,7 +140,8 @@ def computeAllProfiles(runName, outPickleName, quantities=['Mdot', 'rho', 'u', '
   D['profiles'] = listOfListOfProfiles
   D['times'] = listOfListOfTimes
   D['r_sonic'] = r_sonic
-  D['zone'] = (nzone-1) - int(np.log(dump['r_in'])/np.log(int(dump['base'])))
+  D['zones'] = zones
+  D['base'] = base
 
   with open(outPickleName, 'wb') as openFile:
     pickle.dump(D, openFile, protocol=2)
