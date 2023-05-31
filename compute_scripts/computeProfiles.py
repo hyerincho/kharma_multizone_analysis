@@ -72,6 +72,7 @@ def computeAllProfiles(runName, outPickleName, quantities=['Mdot', 'rho', 'u', '
   listOfListOfTimes= []
   radii = []
   zones = []
+  save_zones = True
 
   # if file exists, don't do the whole calculation
   if os.path.isfile(outPickleName):
@@ -84,13 +85,16 @@ def computeAllProfiles(runName, outPickleName, quantities=['Mdot', 'rho', 'u', '
       pdb.set_trace()
     runIndices_calc = np.delete(runIndices_calc,to_del)
     subFolders_calc = np.delete(subFolders_calc,to_del)
-    print("file exists for runs {}-{}. starting from {}".format(existing_idx[0], existing_idx[-1], runIndices[0]))
+    print("file exists for runs {}-{}. starting from {}".format(existing_idx[0], existing_idx[-1], runIndices_calc[0]))
 
     # override with previously calculated data
     listOfListOfProfiles = D_read["profiles"]
     listOfListOfTimes = D_read["times"]
     radii = D_read["radii"]
-    zones = D_read["zones"]
+    if "zones" in D_read:
+      zones = D_read["zones"]
+    else:
+      save_zones = False
 
   for i,runIndex in enumerate(runIndices_calc):
     allFiles = sorted(glob.glob(os.path.join(subFolders_calc[i], '*.phdf')))
@@ -116,8 +120,9 @@ def computeAllProfiles(runName, outPickleName, quantities=['Mdot', 'rho', 'u', '
 
     #Just need this value once for a given annulus.
     radii.append(dump['r1d'])
-    zone = (nzone-1) - int(np.log(dump['r_in'])/np.log(base))
-    zones.append(zone)
+    if save_zones:
+      zone = (nzone-1) - int(np.log(dump['r_in'])/np.log(base))
+      zones.append(zone)
     listOfListOfProfiles.append(listOfProfiles)
     listOfListOfTimes.append(listOfTimes)
 
@@ -140,7 +145,7 @@ def computeAllProfiles(runName, outPickleName, quantities=['Mdot', 'rho', 'u', '
   D['profiles'] = listOfListOfProfiles
   D['times'] = listOfListOfTimes
   D['r_sonic'] = r_sonic
-  D['zones'] = zones
+  if save_zones: D['zones'] = zones
   D['base'] = base
 
   with open(outPickleName, 'wb') as openFile:
