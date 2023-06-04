@@ -7,6 +7,9 @@ import pickle
 import os
 import pdb
 
+import glob
+import h5py
+
 def readQuantity(dictionary, quantity):
 
   invert = False
@@ -31,7 +34,7 @@ def readQuantity(dictionary, quantity):
   return profiles, invert
 
 def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_list=None, linestyle_list=None, figsize=(8,6), flip_sign=False, show_divisions=True, zone_time_average_fraction=0, 
-  xlabel=None, ylabel=None, xlim=None, ylim=None, label_list=None, fig_ax=None, formatting=True, finish=True, rescale=False, rescale_radius=10, rescale_value=1, cycles_to_average=1, trim_zone=True, show_gizmo=False):
+  xlabel=None, ylabel=None, xlim=None, ylim=None, label_list=None, fig_ax=None, formatting=True, finish=True, rescale=False, rescale_radius=10, rescale_value=1, cycles_to_average=1, trim_zone=True, show_gizmo=False, num_time_chunk=4):
 
   if isinstance(listOfPickles, str):
     listOfPickles = [listOfPickles]
@@ -64,7 +67,11 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
     #Formula that produces the zone number of a given run.  It would have been better to have this in some other file though.
     n_zones = D['nzone']
     if n_zones > 1:
-      zone_number_sequence = np.array([np.abs(np.abs(n_zones-1 - (i % (2*n_zones-2)))-(n_zones-1)) for i in range(len(radii))])
+      #zone_number_sequence = np.array([np.abs(np.abs(n_zones-1 - (i % (2*n_zones-2)))-(n_zones-1)) for i in range(len(radii))])
+      try:
+        zone_number_sequence = D["zones"]
+      except:
+        zone_number_sequence = np.array([n_zones-1 - int(np.floor(np.log(radii[i][0])/np.log(8))) for i in range(len(radii))])
     else:
       zone_number_sequence = np.full(len(radii), 0)
 
@@ -144,7 +151,80 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
       ax.plot(r_plot[order], values_plot[order], color=color_list[sim_index], ls=linestyle_list[sim_index], lw=2)
     else:
       # HYERIN: split into time chunks
-      ax.plot([],[])
+      if 'onezone' in listOfPickles[sim_index]:
+        ONEZONE = True
+      else: ONEZONE = False
+      t_last = np.max(D["times"][-1])
+      tDivList = np.array([t_last/np.power(2.,i+1) for i in range(num_time_chunk)])
+      tDivList = tDivList[::-1] # in increasing time order
+      #usableProfiles = [[[]]*num_time_chunk]*n_zones # don't use this. makes multiple mutable objects
+      usableProfiles = [[[] for _ in range(num_time_chunk)] for _ in range(n_zones)] # (n_zones, num_time_chunk) dimension
+      r_save = [None]*n_zones
+      
+      for i,profile in enumerate(profiles):
+        times = D["times"][i]
+        #sorting = [np.argwhere(tDivList<t) for t in times]
+        #bin_num = [sort[-1,0] if len(sort)>0 else None for sort in sorting] # None if there's no time bin to go in
+        sorting = np.argwhere(tDivList<times[0]) # put one annulus run in the same time bin, even if one zone run corresponds to multiple bins
+        bin_num = sorting[-1,0] if len(sorting)>0 else None
+        zone_num = n_zones-1 -int(np.floor(np.log(radii[i][0])/np.log(8)))
+       
+        # taken from above
+        if len(times) > 1 and bin_num is not None or ONEZONE: # If there's only 1 output, skip this run
+          delt = np.gradient(times)
+          if ONEZONE:
+            for bin_num in range(num_time_chunk):
+              if bin_num == num_time_chunk-1:
+                averaging_mask = times > tDivList[bin_num]
+              else:
+                averaging_mask = (times > tDivList[bin_num]) & (times < tDivList[bin_num+1])
+              integrand = np.transpose(np.squeeze(np.array(profile))[averaging_mask])
+              usableProfiles[zone_num][bin_num].append(np.sum(integrand*delt[averaging_mask], axis=1) / np.sum(delt[averaging_mask]))
+          else:
+            averaging_mask = times >= times[-1] - (times[-1]-times[0])*zone_time_average_fraction
+
+            #Always include the last snapshot. Specify this with zone_time_average_fraction == 0.
+            if np.sum(averaging_mask) == 0:
+              averaging_mask[-1] = True
+
+            #An average, taking care to weight different timesteps appropriately.  There's an annoying squeeze and transpose here.
+            integrand = np.transpose(np.squeeze(np.array(profile))[averaging_mask])
+            usableProfiles[zone_num][bin_num].append(np.sum(integrand*delt[averaging_mask], axis=1) / np.sum(delt[averaging_mask]))
+
+          if r_save[zone_num] is None:
+            r_save[zone_num] = radii[i]
+      
+      colors=plt.cm.gnuplot(np.linspace(0.9,0.3,num_time_chunk))
+      for b in range(num_time_chunk):
+        r_plot = np.array([])
+        values_plot = np.array([])
+        for zone in range(n_zones):
+          #Now, given an average within each run, average each separate run.
+          plottable = np.mean(usableProfiles[zone][b], axis=0)
+
+          #Flip the quantity upside-down, usually for inv_beta.
+          if invert:
+            plottable = 1.0 / plottable
+
+          #Next, optionally mask out regions that likely have wall glitches by only taking the central half of the radii
+          n_radii = len(r_save[zone])
+          mask = np.full(n_radii, True, dtype=bool)
+          if n_zones > 1:
+            if trim_zone:
+              if zone > 0:
+                mask[-int(n_radii/4):] = False
+              if zone < n_zones - 1:
+                mask[:int(n_radii/4)] = False
+
+          r_plot = np.concatenate([r_plot,r_save[zone][mask]])
+          values_plot = np.concatenate([values_plot,plottable[mask]*(-1)**int(flip_sign)])
+
+        r_plot = np.squeeze(np.array(r_plot))
+        values_plot = np.squeeze(np.array(values_plot))
+        order = np.argsort(r_plot)
+        ax.plot(r_plot[order], values_plot[order], color=colors[b], ls='-', lw=2, label='t={:.2g}'.format(tDivList[b]*np.sqrt(2))) # logarithmic mean should be *np.sqrt(2)
+
+
 
   #Formatting
   if formatting:
@@ -164,7 +244,7 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
       #  divisions.append(radii[zone][-1])
       #  if (zone == n_zones-1) | (zone == n_zones-2):
       #    divisions.append(radii[zone][0])
-      divisions = [8**i for i in range(n_zones+1)]
+      divisions = [8**i for i in range(n_zones+2)]
       for div in divisions:
         ax.plot([div]*2, ax.get_ylim(), alpha=0.2, color='grey', lw=1)
 
@@ -223,17 +303,19 @@ if __name__ == '__main__':
   xlim=None
   
   # 1a) Bondi
+  '''
   listOfPickles = ['../data_products/bondi_multizone_030723_bondi_128^3_profiles_all.pkl']
   listOfLabels = [''] #'GIZMO, no extg', 
   plot_dir = '../plots/052923_bondi'
   avg_frac=0.
   cta=1
   xlim=[2,1e8]
+  '''
 
   # 1b&c) GIZMO
   '''
-  listOfPickles = ['../data_products/production_runs/gizmo_extg_1e8_profiles_all.pkl'] #'../data_products/bondi_multizone_052523_gizmo_n8_64^3_noshock_profiles_all.pkl', 
-  listOfLabels = [''] #'GIZMO, no extg', 
+  listOfPickles = ['../data_products/production_runs/gizmo_extg_1e8_profiles_all.pkl', '../data_products/bondi_multizone_052523_gizmo_n8_64^3_noshock_profiles_all.pkl']
+  listOfLabels = ['GIZMO, extg', 'GIZMO, no extg']
   plot_dir = '../plots/052923_gizmo'
   avg_frac=0.5
   cta=10
@@ -241,11 +323,13 @@ if __name__ == '__main__':
   '''
 
   # 2a) weak field test (n=4)
-  #listOfPickles = ['../data_products/'+dirname for dirname in ['bondi_multizone_050423_onezone_bflux0_1e-8_2d_n4_profiles_all.pkl', 'bondi_multizone_050423_bflux0_1e-8_2d_n4_profiles_all.pkl']]
-  #listOfLabels = ['n=1', 'n=4']
-  #plot_dir = '../plots/052923_weakfield'
-  #avg_frac=0
-  #cta=1
+  '''
+  listOfPickles = ['../data_products/'+dirname for dirname in ['bondi_multizone_050423_onezone_bflux0_1e-8_2d_n4_profiles_all2.pkl', 'bondi_multizone_050423_bflux0_1e-8_2d_n4_profiles_all.pkl']]
+  listOfLabels = ['n=1', 'n=4']
+  plot_dir = '../plots/052923_weakfield'
+  avg_frac=0
+  cta=1
+  '''
 
   # 2b) strong field test
   '''
@@ -266,29 +350,35 @@ if __name__ == '__main__':
 
   # 2c) n=8
   '''
-  listOfPickles = ['../data_products/'+dirname for dirname in ['bondi_multizone_050123_bflux0_2e-8_32^3_n8_profiles_all.pkl', 'bondi_multizone_050223_bflux0_2e-8_64^3_n8_profiles_all.pkl', 'bondi_multizone_050423_bflux0_2e-8_96^3_n8_test_faster_rst_profiles_all.pkl', 'production_runs/bondi_bz2e-8_1e8_profiles_all.pkl', '/production_runs/bondi_bz2e-8_1e8_96_profiles_all.pkl']]
-  listOfLabels = ['32^3', '64^3', '96^3', '64^3_C', '96^3_C']
+  listOfPickles = ['../data_products/'+dirname for dirname in ['bondi_multizone_050123_bflux0_2e-8_32^3_n8_profiles_all.pkl', 'bondi_multizone_050223_bflux0_2e-8_64^3_n8_profiles_all.pkl', 'bondi_multizone_050423_bflux0_2e-8_96^3_n8_test_faster_rst_profiles_all.pkl', 'production_runs/bondi_bz2e-8_1e8_profiles_all.pkl', '/production_runs/bondi_bz2e-8_1e8_96_profiles_all.pkl', '/production_runs/bondi_bz2e-8_1e8_nonlim_profiles_all.pkl']]
+  listOfLabels = ['32^3', '64^3', '96^3', '64^3_C', '96^3_C', '64_nonlim_C']
   plot_dir = '../plots/052923_n8'
   avg_frac=0.5
   cta=40
   '''
 
-  # 2d) weak field test (n=3)
+  # test
   '''
-  listOfPickles = ['../data_products/'+dirname for dirname in ['bondi_multizone_050123_onezone_bflux0_1e-8_2d_newrs_profiles.pkl', 'bondi_multizone_050123_bflux0_1e-8_2d_newrs_profiles.pkl', 'bondi_multizone_050423_bflux0_1e-8_2d_newrs_no_short_t_out_profiles.pkl']]
-  listOfLabels = ['n=1', 'n=3','n=3_noshort']
-  n_zones_list = [1, 3, 3]
-  plot_dir = '../plots/050223_n=1vsn=3'
+  #listOfPickles = ['../data_products/052523_bflux_n8_32^3_profiles_all.pkl']
+  #listOfPickles = ['../data_products/bondi_multizone_050123_bflux0_2e-8_32^3_n8_profiles_all.pkl']
+  #listOfPickles = ['../data_products/bondi_multizone_050123_bflux0_1e-4_96^3_profiles_all.pkl']
+  #listOfPickles = ['../data_products/bondi_multizone_050423_bflux0_2e-8_96^3_n8_test_faster_rst_profiles_all2.pkl']
+  #listOfPickles = ['../data_products/bondi_multizone_050123_onezone_bflux0_1e-4_64^3_profiles_all.pkl']
+  listOfPickles = ['../data_products/production_runs/bondi_bz2e-8_1e8_nonlim_profiles_all.pkl']
+  listOfLabels = ['']
+  plot_dir = "../plots/test"
+  cta=0 # time evolution
+  avg_frac=0.5
   '''
 
   # colors, linestyles, directory
   colors = ['k','r', 'b',  'g', 'm', 'c', 'y']
-  linestyles=['-','-',':',':',':', '--', ':']
+  linestyles=['-','--',':',':',':', '--', ':']
   os.makedirs(plot_dir, exist_ok=True)
 
-  for quantity in ['Mdot', 'rho', 'u', 'T', 'abs_u^r', 'abs_u^phi', 'abs_u^th', 'u^r', 'u^phi', 'u^th']: #'beta', 
+  for quantity in ['beta', 'Mdot', 'rho', 'u', 'T', 'abs_u^r', 'abs_u^phi', 'abs_u^th', 'u^r', 'u^phi', 'u^th']: #
     output = plot_dir+"/profile_"+quantity+".pdf"
     #output = None
-    ylim = [None,[1e-2,10]][(quantity in ['Mdot'])] # [1e-2,10] if Mdot, None otherwise
+    ylim = [None,[1e-2,10]][(quantity in ['Mdot'])] # [1e-3,10] if Mdot, None otherwise
     plotProfiles(listOfPickles, quantity, output=output, zone_time_average_fraction=avg_frac, cycles_to_average=cta, color_list=colors, linestyle_list=linestyles, label_list=listOfLabels, rescale=False, \
-    trim_zone=True, flip_sign=(quantity in ['u^r']), xlim=xlim, ylim=ylim ,show_gizmo=("gizmo" in plot_dir))#, time_chunks=4)
+    trim_zone=True, flip_sign=(quantity in ['u^r']), xlim=xlim, ylim=ylim ,show_gizmo=("gizmo" in plot_dir), num_time_chunk=3)
