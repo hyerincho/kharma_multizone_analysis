@@ -79,7 +79,7 @@ def computeAllProfiles(runName, outPickleName, quantities=['Mdot', 'rho', 'u', '
     with open(outPickleName, 'rb') as openFile:
       D_read = pickle.load(openFile)
     existing_idx = D_read["runIndices"]
-    to_del =[idx for (idx, value) in enumerate(runIndices) if value in existing_idx] # indices to delete
+    to_del =[idx for (idx, value) in enumerate(runIndices[:-1]) if value in existing_idx] # indices to delete (keep only one overlap just in case the run was not finished when previously calculated)
     if len(set(existing_idx)-set(runIndices_calc))>0:
       print("WARNING: There are some runs in the pre-existing file that are not present now. This might screw up the calculation.")
       pdb.set_trace()
