@@ -34,7 +34,7 @@ def readQuantity(dictionary, quantity):
   return profiles, invert
 
 def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_list=None, linestyle_list=None, figsize=(8,6), flip_sign=False, show_divisions=True, zone_time_average_fraction=0, 
-  xlabel=None, ylabel=None, xlim=None, ylim=None, label_list=None, fig_ax=None, formatting=True, finish=True, rescale=False, rescale_radius=10, rescale_value=1, cycles_to_average=1, trim_zone=True, show_gizmo=False, num_time_chunk=4):
+  xlabel=None, ylabel=None, xlim=None, ylim=None, label_list=None, fig_ax=None, formatting=True, finish=True, rescale=False, rescale_radius=10, rescale_value=1, cycles_to_average=1, trim_zone=True, show_gizmo=False, show_rscale=False, num_time_chunk=4):
 
   if isinstance(listOfPickles, str):
     listOfPickles = [listOfPickles]
@@ -248,6 +248,10 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
       for div in divisions:
         ax.plot([div]*2, ax.get_ylim(), alpha=0.2, color='grey', lw=1)
 
+  try:
+    r_sonic = D["r_sonic"]
+  except:
+    r_sonic = np.sqrt(1e5)
   if show_gizmo:
     dat_gz=np.loadtxt("/n/holylfs05/LABS/bhi/Users/hyerincho/grmhd//data/gizmo/031623_100Myr/dat.txt")
     r_gizmo=dat_gz[:,0]
@@ -262,14 +266,17 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
       to_plot = T_gizmo
     if to_plot is not None:
       ax.plot(r_gizmo,to_plot,'b--',lw=3,label='GIZMO')
+  elif show_rscale:
+    # show density scalings
+    if "rho" in quantity: # and "rot" in dirtag:
+        rarr= np.logspace(np.log10(2),np.log10(r_sonic**2.),20)
+        factor=1e-5#7e-7
+        ax.plot(rarr,np.power(rarr/1e3,-1)*factor,'g-',alpha=0.3,lw=10,label=r'$r^{-1}$')
+        #ax.plot(rarr,np.power(rarr/1e3,-1/2)*factor,'g:',alpha=0.3,lw=10,label=r'$r^{-1/2}$')
   else:
     # Bondi analytic overplotting
     xlim = ax.get_xlim()
     r_bondi = np.logspace(np.log10(xlim[0]), np.log10(xlim[1]), 50)
-    try:
-      r_sonic = D["r_sonic"]
-    except:
-      r_sonic = np.sqrt(1e5)
     analytic_sol = bondi.get_quantity_for_rarr(r_bondi, quantity, rs=r_sonic)
     if analytic_sol is not None:
       ax.plot(r_bondi, analytic_sol, color='slategrey',label='bondi analytic', lw=8, ls=':', zorder=-100,alpha=0.7)
@@ -301,6 +308,7 @@ if __name__ == '__main__':
   '''
   
   xlim=None
+  show_rscale=False
   
   # 1a) Bondi
   '''
@@ -329,24 +337,25 @@ if __name__ == '__main__':
   plot_dir = '../plots/052923_weakfield'
   avg_frac=0
   cta=1
+  xlim=[2,3.5e4]
   '''
 
   # 2b) strong field test
-  '''
   listOfPickles = ['../data_products/'+dirname for dirname in \
       ['bondi_multizone_050123_onezone_bflux0_1e-4_64^3_profiles_all.pkl', \
       'bondi_multizone_042723_bflux0_1e-4_32^3_profiles_all.pkl', \
       'bondi_multizone_042723_bflux0_1e-4_64^3_profiles_all.pkl', \
       'bondi_multizone_050123_bflux0_1e-4_96^3_profiles_all.pkl', \
-      'bondi_multizone_050523_bflux0_1e-4_128^3_n3_noshort_profiles_all.pkl', \
-      'bondi_multizone_050123_bflux0_0_64^3_profiles_all.pkl', \
-      'bondi_multizone_050823_bflux0_0_64^3_nojit_profiles_all.pkl']]
+      'bondi_multizone_050523_bflux0_1e-4_128^3_n3_noshort_profiles_all2.pkl']] #, \
+      #'bondi_multizone_050123_bflux0_0_64^3_profiles_all.pkl', \
+      #'bondi_multizone_050823_bflux0_0_64^3_nojit_profiles_all.pkl']]
   listOfLabels = ['n=1', 'n=3_32^3', 'n=3', 'n=3_96^3', 'n=3_128^3', 'HD+jit', 'HD+nojit']
   n_zones_list = [1, 3, 3, 3, 3, 3, 3]
   plot_dir = '../plots/052923_strongfield'
-  avg_frac=0.3
-  cta=75
-  '''
+  avg_frac=0.05 #0.3 #
+  cta=130 #50 #
+  show_rscale=True
+  xlim=[2,4.5e3]
 
   # 2c) n=8
   '''
@@ -359,12 +368,13 @@ if __name__ == '__main__':
 
   # test
   '''
+  listOfPickles = ['../data_products/bondi_multizone_050523_bflux0_1e-4_128^3_n3_noshort_profiles_all2.pkl']
   #listOfPickles = ['../data_products/052523_bflux_n8_32^3_profiles_all.pkl']
   #listOfPickles = ['../data_products/bondi_multizone_050123_bflux0_2e-8_32^3_n8_profiles_all.pkl']
   #listOfPickles = ['../data_products/bondi_multizone_050123_bflux0_1e-4_96^3_profiles_all.pkl']
   #listOfPickles = ['../data_products/bondi_multizone_050423_bflux0_2e-8_96^3_n8_test_faster_rst_profiles_all2.pkl']
   #listOfPickles = ['../data_products/bondi_multizone_050123_onezone_bflux0_1e-4_64^3_profiles_all.pkl']
-  listOfPickles = ['../data_products/production_runs/bondi_bz2e-8_1e8_nonlim_profiles_all.pkl']
+  #listOfPickles = ['../data_products/production_runs/bondi_bz2e-8_1e8_nonlim_profiles_all.pkl']
   listOfLabels = ['']
   plot_dir = "../plots/test"
   cta=0 # time evolution
@@ -373,7 +383,7 @@ if __name__ == '__main__':
 
   # colors, linestyles, directory
   colors = ['k','r', 'b',  'g', 'm', 'c', 'y']
-  linestyles=['-','--',':',':',':', '--', ':']
+  linestyles=['-',':',':',':',':', '--', ':']
   os.makedirs(plot_dir, exist_ok=True)
 
   for quantity in ['beta', 'Mdot', 'rho', 'u', 'T', 'abs_u^r', 'abs_u^phi', 'abs_u^th', 'u^r', 'u^phi', 'u^th']: #
@@ -381,4 +391,4 @@ if __name__ == '__main__':
     #output = None
     ylim = [None,[1e-2,10]][(quantity in ['Mdot'])] # [1e-3,10] if Mdot, None otherwise
     plotProfiles(listOfPickles, quantity, output=output, zone_time_average_fraction=avg_frac, cycles_to_average=cta, color_list=colors, linestyle_list=linestyles, label_list=listOfLabels, rescale=False, \
-    trim_zone=True, flip_sign=(quantity in ['u^r']), xlim=xlim, ylim=ylim ,show_gizmo=("gizmo" in plot_dir), num_time_chunk=3)
+    trim_zone=True, flip_sign=(quantity in ['u^r']), xlim=xlim, ylim=ylim ,show_gizmo=("gizmo" in plot_dir), show_rscale=show_rscale, num_time_chunk=6)
