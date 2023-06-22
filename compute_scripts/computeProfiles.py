@@ -15,6 +15,8 @@ def shellAverage(dump, quantity, imin=0, mass_weight=True):
   if quantity == 'Mdot':
     #This is the weirdest one.  We won't average ourselves, and we'll use a built-in pyharm function.
     return -pyharm.shell_sum(dump, 'FM')
+  if quantity == 'Edot':
+    return -pyharm.shell_sum(dump, 'FE')
   if quantity == 'T':
     to_average = dump['u'] / dump['rho'] * (dump['gam']-1)
   else:
@@ -79,7 +81,7 @@ def computeAllProfiles(runName, outPickleName, quantities=['Mdot', 'rho', 'u', '
     with open(outPickleName, 'rb') as openFile:
       D_read = pickle.load(openFile)
     existing_idx = D_read["runIndices"]
-    to_del =[idx for (idx, value) in enumerate(runIndices[:-1]) if value in existing_idx] # indices to delete (keep only one overlap just in case the run was not finished when previously calculated)
+    to_del =[idx for (idx, value) in enumerate(runIndices) if value in existing_idx[:-1]] # indices to delete (keep only one overlap just in case the run was not finished when previously calculated)
     if len(set(existing_idx)-set(runIndices_calc))>0:
       print("WARNING: There are some runs in the pre-existing file that are not present now. This might screw up the calculation.")
       pdb.set_trace()
@@ -88,11 +90,11 @@ def computeAllProfiles(runName, outPickleName, quantities=['Mdot', 'rho', 'u', '
     print("file exists for runs {}-{}. starting from {}".format(existing_idx[0], existing_idx[-1], runIndices_calc[0]))
 
     # override with previously calculated data
-    listOfListOfProfiles = D_read["profiles"]
-    listOfListOfTimes = D_read["times"]
-    radii = D_read["radii"]
+    listOfListOfProfiles = D_read["profiles"][:-1]
+    listOfListOfTimes = D_read["times"][:-1]
+    radii = D_read["radii"][:-1]
     if "zones" in D_read:
-      zones = D_read["zones"]
+      zones = D_read["zones"][:-1]
     else:
       save_zones = False
 
@@ -163,5 +165,5 @@ if __name__ == '__main__':
   run = sys.argv[1]
 
   inName = os.path.join(grmhdLocation, run)
-  outName = os.path.join(dataLocation, run + '_profiles_all.pkl')
-  computeAllProfiles(inName, outName, quantities=['Mdot', 'rho', 'u', 'T', 'abs_u^r', 'u^phi', 'u^th', 'u^r','abs_u^th', 'abs_u^phi', 'u^t', 'b', 'inv_beta', 'beta'], final_only=False, onezone_override=('onezone' in inName))
+  outName = os.path.join(dataLocation, run + '_profiles_all2.pkl')
+  computeAllProfiles(inName, outName, quantities=['Edot', 'Mdot', 'rho', 'u', 'T', 'abs_u^r', 'u^phi', 'u^th', 'u^r','abs_u^th', 'abs_u^phi', 'u^t', 'b', 'inv_beta', 'beta'], final_only=False, onezone_override=('onezone' in inName))
