@@ -54,6 +54,7 @@ def phasePlot(D, quantity, roundtrip=0, tag=None):
         fig.suptitle(tag)
     
     plt.savefig('./phase_plot_{:05d}.png'.format(roundtrip),bbox_inches='tight')
+    plt.close()
 
 
 if __name__ == '__main__':
