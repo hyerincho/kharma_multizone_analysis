@@ -233,7 +233,7 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
       if 'onezone' in listOfPickles[sim_index]: ONEZONE = True
       else: ONEZONE = False
       
-      factor = np.sqrt(2) #2 #1.1 # 
+      factor =  np.sqrt(2) #2 #1.1 #
       if quantity == 'eta':
           profiles, invert = readQuantity(D, 'Edot')
           tDivList, usableProfiles_num, r_save, num_save = assignTimeBins(D, profiles, ONEZONE, num_time_chunk, zone_time_average_fraction, factor)
@@ -265,7 +265,10 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
           if quantity == 'eta':
             plottable_num = np.mean(usableProfiles_num[zone][b], axis=0)
             plottable_den = np.mean(usableProfiles_den[zone][b], axis=0)
-            plottable = 1. - plottable_num/plottable_den #+ 4.5e-3
+            if zone == n_zones-1: # r=10
+                i10 = np.argmin(abs(r_save[zone]-10))
+                Mdot_save = plottable_den[i10]
+            plottable = plottable_den- plottable_num #+ 4.5e-3
             #plottable = np.mean(usableProfiles[zone][b],axis=0)
             invert = False
           elif quantity == 'etaMdot':
@@ -300,6 +303,8 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
 
         r_plot = np.squeeze(np.array(r_plot))
         values_plot = np.squeeze(np.array(values_plot))
+        if quantity == "eta":
+            values_plot /= Mdot_save # divide by  Mdot at r=10
         order = np.argsort(r_plot)
         if label_list is None: label = 't={:.3g} - {:.3g}'.format(tDivList[b],tDivList[b+1])
         else: label = label_list[sim_index]
@@ -471,6 +476,7 @@ if __name__ == '__main__':
   '''
 
   # 2c) n=8
+  '''
   dictOfAll = {}
   dictOfAll['32_ur0'] = ['062023_0.02tff_ur0_profiles_all.pkl','k']
   #dictOfAll['64_ur0'] = ['062623_0.02tff_ur0_64_profiles_all2.pkl','b']
@@ -506,9 +512,9 @@ if __name__ == '__main__':
   boxcar_factor=4 #2
   #colors = ['g','k','y','c','pink','grey', 'tomato','peru','tan', 'royalblue','sienna','r', 'm', 'c', 'y']
   #colors = ['k','pink','grey','tan', 'royalblue','sienna','r', 'm']
+  '''
 
   # test
-  '''
   #listOfPickles = ['../data_products/062623_n3_tff_profiles_all2.pkl']
   #listOfPickles = ['../data_products/070823_b20n4_32_profiles_all2.pkl']
   #listOfPickles = ['../data_products/070923_b6n7_32_profiles_all2.pkl']
@@ -525,7 +531,6 @@ if __name__ == '__main__':
   num_time_chunk=4
   boxcar_factor=2 #4
   colors=None
-  '''
 
   # colors, linestyles, directory
   linestyles=['-',':',':',':',':', '--', ':']
