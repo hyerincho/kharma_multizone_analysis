@@ -7,3 +7,6 @@ plot_scripts/__pycache__/*
 plots/*
 data
 movies/*
+data_products/*
+logs/*
+*.png
