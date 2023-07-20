@@ -233,7 +233,7 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
       if 'onezone' in listOfPickles[sim_index]: ONEZONE = True
       else: ONEZONE = False
       
-      factor =  np.sqrt(2) #2 #1.1 #
+      factor = 2 #1.1 # np.sqrt(2) #
       if quantity == 'eta':
           profiles, invert = readQuantity(D, 'Edot')
           tDivList, usableProfiles_num, r_save, num_save = assignTimeBins(D, profiles, ONEZONE, num_time_chunk, zone_time_average_fraction, factor)
@@ -519,16 +519,16 @@ if __name__ == '__main__':
   #listOfPickles = ['../data_products/070823_b20n4_32_profiles_all2.pkl']
   #listOfPickles = ['../data_products/070923_b6n7_32_profiles_all2.pkl']
   #listOfPickles = ['../data_products/071023_b3n7_profiles_all2.pkl']
-  #listOfPickles = ['../data_products/071023_beta01_profiles_all2.pkl']
+  listOfPickles = ['../data_products/071023_beta01_profiles_all2.pkl']
   #listOfPickles = ['../data_products/071223_b3n16_beta01_profiles_all2.pkl']
-  listOfPickles = ['../data_products/071323_beta01_64_profiles_all2.pkl']
+  #listOfPickles = ['../data_products/071323_beta01_64_profiles_all2.pkl']
   #listOfPickles = ['../data_products/071423_beta03_profiles_all2.pkl']
   listOfLabels = None
   plot_dir = "../plots/test"
   cta=0 # time evolution
   avg_frac=0.5
   show_rscale=True
-  num_time_chunk=4
+  num_time_chunk=8 # 4
   boxcar_factor=2 #4
   colors=None
 
@@ -536,7 +536,7 @@ if __name__ == '__main__':
   linestyles=['-',':',':',':',':', '--', ':']
   os.makedirs(plot_dir, exist_ok=True)
 
-  for quantity in ['eta', 'beta', 'Edot', 'Mdot', 'rho', 'u', 'T', 'abs_u^r', 'abs_u^phi', 'abs_u^th', 'u^r', 'u^phi', 'u^th']: #
+  for quantity in ['eta', 'etaMdot', 'beta', 'Edot', 'Mdot', 'rho', 'u', 'T', 'abs_u^r', 'abs_u^phi', 'abs_u^th', 'u^r', 'u^phi', 'u^th']: #
     output = plot_dir+"/profile_"+quantity+".pdf"
     #output = None
     ylim = [None,[1e-4,10]][(quantity in ['Mdot'])] # [1e-3,10] if Mdot, None otherwise
