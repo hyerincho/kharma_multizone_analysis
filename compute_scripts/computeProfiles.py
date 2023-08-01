@@ -112,6 +112,8 @@ def computeAllProfiles(runName, outPickleName, quantities=['Mdot', 'rho', 'u', '
       #Just need these values once for the entire simulation.
       if nzone is None:
         nzone = dump['nzone']
+      try: nzone_eff = dump['nzone_eff']
+      except: nzone_eff = nzone
       if r_sonic is None:
         r_sonic = dump['rs']
       if base is None:
@@ -123,7 +125,7 @@ def computeAllProfiles(runName, outPickleName, quantities=['Mdot', 'rho', 'u', '
     #Just need this value once for a given annulus.
     radii.append(dump['r1d'])
     if save_zones:
-      zone = (nzone-1) - int(np.log(dump['r_in'])/np.log(base))
+      zone = (nzone_eff-1) - int(np.log(dump['r_in'])/np.log(base))
       zones.append(zone)
     listOfListOfProfiles.append(listOfProfiles)
     listOfListOfTimes.append(listOfTimes)
@@ -144,6 +146,7 @@ def computeAllProfiles(runName, outPickleName, quantities=['Mdot', 'rho', 'u', '
   D['quantities'] = quantities
   D['runName'] = runName
   D['nzone'] = nzone
+  D['nzone_eff'] = nzone_eff
   D['profiles'] = listOfListOfProfiles
   D['times'] = listOfListOfTimes
   D['r_sonic'] = r_sonic

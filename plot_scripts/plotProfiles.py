@@ -54,24 +54,29 @@ def assignTimeBins(D, profiles, ONEZONE=False, num_time_chunk=4, zone_time_avera
   tDivList = np.array([t_last/np.power(factor,i+1) for i in range(num_time_chunk)])
   tDivList = tDivList[::-1] # in increasing time order
   n_zones = D['nzone']
+  try: n_zones_eff = D['nzone_eff']
+  except : n_zones_eff = n_zones
+
+  if 'moving_rin' in D['runName'] or 'combine_outer' in D['runName']: # temporary Hyerin (07/31/23)
+    n_zones_eff -= 2
   radii = D['radii']
-  usableProfiles = [[[] for _ in range(num_time_chunk)] for _ in range(n_zones)] # (n_zones, num_time_chunk) dimension
-  r_save = [None]*n_zones
-  num_save = np.zeros((n_zones,num_time_chunk))
+  usableProfiles = [[[] for _ in range(num_time_chunk)] for _ in range(n_zones_eff)] # (n_zones, num_time_chunk) dimension
+  r_save = [None]*n_zones_eff
+  num_save = np.zeros((n_zones_eff,num_time_chunk))
   try: base = D["base"]
   except: base = 8
 
   for i,profile in enumerate(profiles):
     times = D["times"][i]
     run_idx = D["runIndices"][i]
-    iteration = np.maximum(np.ceil(run_idx/(n_zones-1)),1)
+    iteration = np.maximum(np.ceil(run_idx/(n_zones_eff-1)),1)
     if 1: #iteration % 2 == 1 or run_idx % (n_zones-1)==0: # selecting only outwards direction
         if len(times)<1:
             #pdb.set_trace()
             continue # skip this iteration
         sorting = np.argwhere(tDivList<times[0]) # put one annulus run in the same time bin, even if one zone run corresponds to multiple bins
         bin_num = sorting[-1,0] if len(sorting)>0 else None
-        zone_num = n_zones-1 -int(np.floor(np.log(radii[i][0])/np.log(base)))
+        zone_num = n_zones_eff-1 -int(np.floor(np.log(radii[i][0])/np.log(base)))
        
         # taken from above
         if len(times) > 1 and bin_num is not None or ONEZONE: # If there's only 1 output, skip this run
@@ -135,7 +140,11 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
     radii = D['radii']
     #Formula that produces the zone number of a given run.  It would have been better to have this in some other file though.
     n_zones = D['nzone']
-    if n_zones > 1:
+    try: n_zones_eff = D['nzone_eff']
+    except: n_zones_eff = n_zones
+    if 'moving_rin' in D['runName'] or 'combine_outer' in D['runName']: # temporary Hyerin (07/31/23)
+      n_zones_eff -= 2
+    if n_zones_eff > 1:
       #zone_number_sequence = np.array([np.abs(np.abs(n_zones-1 - (i % (2*n_zones-2)))-(n_zones-1)) for i in range(len(radii))])
       try:
           base = D["base"]
@@ -144,7 +153,7 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
       try:
         zone_number_sequence = np.array(D["zones"])
       except:
-        zone_number_sequence = np.array([n_zones-1 - int(np.floor(np.log(radii[i][0])/np.log(base))) for i in range(len(radii))])
+        zone_number_sequence = np.array([n_zones_eff-1 - int(np.floor(np.log(radii[i][0])/np.log(base))) for i in range(len(radii))])
     else:
       zone_number_sequence = np.full(len(radii), 0)
 
@@ -167,9 +176,9 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
           if (rescale_radius >= r_set[0]) & (rescale_radius <= r_set[-1]):
             rescalingFactor = rescale_value / np.interp(np.log10(rescale_radius), np.log10(r_set), profile_set)
       last_time = 0
-      for zone in range(n_zones):
+      for zone in range(n_zones_eff):
         matchingIndices = np.where(zone_number_sequence == zone)[0]
-        if zone in [0,n_zones-1]:
+        if zone in [0,n_zones_eff-1]:
           #Tricky edge case: there are half as many instances of the zones at the ends.
           cycles_to_average_halved = int(np.ceil(cycles_to_average/2))
         else: # keep original cycles_to_average
@@ -214,11 +223,11 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
         finalMatchingIndex = indicesToAverage[-1]
         n_radii = len(radii[finalMatchingIndex])
         mask = np.full(n_radii, True, dtype=bool)
-        if n_zones > 1:
+        if n_zones_eff > 1:
           if trim_zone:
             if zone > 0:
               mask[-int(n_radii/4):] = False
-            if zone < n_zones - 1:
+            if zone < n_zones_eff - 1:
               mask[:int(n_radii/4)] = False
 
         r_plot = np.concatenate([r_plot,radii[finalMatchingIndex][mask]])
@@ -233,7 +242,7 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
       if 'onezone' in listOfPickles[sim_index]: ONEZONE = True
       else: ONEZONE = False
       
-      factor = 2 #1.1 # np.sqrt(2) #
+      factor = 2 #np.sqrt(2) # 1.1 # 
       if quantity == 'eta':
           profiles, invert = readQuantity(D, 'Edot')
           tDivList, usableProfiles_num, r_save, num_save = assignTimeBins(D, profiles, ONEZONE, num_time_chunk, zone_time_average_fraction, factor)
@@ -260,12 +269,12 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
         r_plot = np.array([])
         values_plot = np.array([])
         print("{}: t={:.3g}-{:.3g}, # of run summed is {}".format(b,tDivList[b],tDivList[b+1], num_save[:,b]))
-        for zone in range(n_zones):
+        for zone in range(n_zones_eff):
           #Now, given an average within each run, average each separate run.
           if quantity == 'eta':
             plottable_num = np.mean(usableProfiles_num[zone][b], axis=0)
             plottable_den = np.mean(usableProfiles_den[zone][b], axis=0)
-            if zone == n_zones-1: # r=10
+            if zone == n_zones_eff-1: # r=10
                 i10 = np.argmin(abs(r_save[zone]-10))
                 Mdot_save = plottable_den[i10]
             plottable = plottable_den- plottable_num #+ 4.5e-3
@@ -289,14 +298,23 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
             plottable = 1.0 / plottable
 
           #Next, optionally mask out regions that likely have wall glitches by only taking the central half of the radii
-          n_radii = len(r_save[zone])
-          mask = np.full(n_radii, True, dtype=bool)
-          if n_zones > 1:
+          if 'moving_rin' in D['runName']: # temporary Hyerin (07/31/23)
+            n_radii = int(len(r_save[n_zones_eff-1])*2/(n_zones+1))
+            
+            mask = np.full(len(r_save[zone]), True, dtype=bool)
             if trim_zone:
-              if zone > 0:
-                mask[-int(n_radii/4):] = False
-              if zone < n_zones - 1:
-                mask[:int(n_radii/4)] = False
+                if zone != n_zones_eff-1:
+                    mask[:]=False
+          else:
+            n_radii = len(r_save[n_zones_eff-1])#len(r_save[zone]) # only take smallest annuli'ls n_radii
+
+            mask = np.full(len(r_save[zone]), True, dtype=bool)
+            if n_zones_eff > 1:
+              if trim_zone:
+                if zone > 0:
+                  mask[-int(n_radii/4):] = False
+                if zone < n_zones_eff - 1:
+                  mask[:int(n_radii/4)] = False
 
           r_plot = np.concatenate([r_plot,r_save[zone][mask]])
           values_plot = np.concatenate([values_plot,plottable[mask]*(-1)**int(flip_sign)])
@@ -478,23 +496,23 @@ if __name__ == '__main__':
   # 2c) n=8
   '''
   dictOfAll = {}
-  dictOfAll['32_ur0'] = ['062023_0.02tff_ur0_profiles_all.pkl','k']
+  #dictOfAll['32_ur0'] = ['062023_0.02tff_ur0_profiles_all.pkl','k']
   #dictOfAll['64_ur0'] = ['062623_0.02tff_ur0_64_profiles_all2.pkl','b']
-  dictOfAll['32_difftchar'] = ['062223_difftchar_profiles_all2.pkl', 'grey']
-  #dictOfAll['32_const'] = ['062623_constinit_profiles_all2.pkl','blueviolet']
-  #dictOfAll['32_const_difftchar'] = ['062623_constinit_difftchar_profiles_all2.pkl','blue']
-  #dictOfAll['32_0.01'] = ['062623_0.01tff_profiles_all2.pkl','crimson']
-  #dictOfAll['32_0.04'] = ['062623_0.04tff_profiles_all2.pkl','darkorange']
-  #dictOfAll['32_0.01_8_6'] = ['062723_0.01tff_8_6_profiles_all2.pkl','peru']
-  #dictOfAll['32_0.01_5_4'] = ['062723_0.01tff_5_4_profiles_all2.pkl','pink']
-  #dictOfAll['32_0.04_b3'] = ['062723_b3_0.04tff_profiles_all2.pkl','tan']
-  #dictOfAll['32_0.2_b3'] = ['062723_b3_0.2tff_profiles_all2.pkl','sienna']
-  #dictOfAll['32_b3_beta1e1'] = ['071223_b3n16_beta10_profiles_all2.pkl', 'sienna']
-  dictOfAll['32_b3_beta1e0'] = ['071223_b3n16_beta01_profiles_all2.pkl', 'tan']
-  dictOfAll['32_beta1e1'] = ['071023_beta10_profiles_all2.pkl', 'darkgreen']
-  dictOfAll['32_beta1e0'] = ['071023_beta01_profiles_all2.pkl', 'lightgreen']
-  #dictOfAll['32_beta3e0'] = ['071423_beta03_profiles_all2.pkl', 'yellowgreen']
-  dictOfAll['64'] = ['071323_beta01_64_profiles_all2.pkl', 'b']
+  #dictOfAll['32_difftchar'] = ['062223_difftchar_profiles_all2.pkl', 'grey']
+  #dictOfAll['32_b3_beta1e0'] = ['071223_b3n16_beta01_profiles_all2.pkl', 'tan']
+  #dictOfAll['32_beta1e1'] = ['071023_beta10_profiles_all2.pkl', 'darkgreen']
+  #dictOfAll['32_g3, b2r9'] = ['072623_jitall_g3b2r9_profiles_all2.pkl', 'blueviolet']
+  #dictOfAll['32_g3, b2r100'] = ['072623_jitall_profiles_all2.pkl', 'g']
+  #dictOfAll['32_g10,b2r9'] = ['072623_jitall_g10b2r9_profiles_all2.pkl', 'pink']
+  #dictOfAll['32_g10,b2r100'] = ['072623_jitall_g10b2r100_profiles_all2.pkl', 'y']
+  #dictOfAll['32_g50,b2r50'] = ['072623_jitall_g50b2r50_profiles_all2.pkl', 'lightgreen']
+  dictOfAll['32_combine_out,lin'] = ['072723_test_combine_outer_ann_profiles_all2.pkl', 'g']
+  dictOfAll['33_moving_rin,weno'] = ['073023_moving_rin_profiles_all2.pkl', 'grey']
+  #dictOfAll['32_weno'] = ['072623_jitall_weno_profiles_all2.pkl', 'crimson']
+  dictOfAll['32_g10,weno'] = ['072723_weno_g10_profiles_all2.pkl', 'tomato']
+  #dictOfAll['64'] = ['071323_beta01_64_profiles_all2.pkl', 'b']
+  #dictOfAll['64_lin'] = ['072623_bugfixed_jitall_profiles_all2.pkl', 'skyblue']
+  dictOfAll['64_weno'] = ['072823_64_weno_profiles_all2.pkl', 'b']
   #dictOfAll['32_hd'] = ['062623_hd_ur0_profiles_all2.pkl','c']
   listOfPickles = []
   listOfLabels =[]
@@ -503,7 +521,7 @@ if __name__ == '__main__':
       listOfPickles += ['../data_products/'+value[0]]
       listOfLabels += [key]
       colors += [value[1]]
-  plot_dir = '../plots/071223_n8'
+  plot_dir = '../plots/072723_n8'
   avg_frac=0.5
   cta=0 # 40
   num_time_chunk = 1
@@ -515,22 +533,29 @@ if __name__ == '__main__':
   '''
 
   # test
-  #listOfPickles = ['../data_products/062623_n3_tff_profiles_all2.pkl']
-  #listOfPickles = ['../data_products/070823_b20n4_32_profiles_all2.pkl']
-  #listOfPickles = ['../data_products/070923_b6n7_32_profiles_all2.pkl']
-  #listOfPickles = ['../data_products/071023_b3n7_profiles_all2.pkl']
-  listOfPickles = ['../data_products/071023_beta01_profiles_all2.pkl']
+  #listOfPickles = ['../data_products/production_runs/gizmo_extg_1e8_profiles_all.pkl']
+  #listOfPickles = ['../data_products/071023_beta01_profiles_all2.pkl']
+  #listOfPickles = ['../data_products/071723_diffbinit_profiles_all2.pkl']
   #listOfPickles = ['../data_products/071223_b3n16_beta01_profiles_all2.pkl']
   #listOfPickles = ['../data_products/071323_beta01_64_profiles_all2.pkl']
   #listOfPickles = ['../data_products/071423_beta03_profiles_all2.pkl']
+  #listOfPickles = ['../data_products/072423_gam3_bsqrho9_profiles_all2.pkl']
+  #listOfPickles = ['../data_products/072623_jitall_weno_profiles_all2.pkl']
+  #listOfPickles = ['../data_products/072623_bugfixed_jitall_profiles_all2.pkl']
+  #listOfPickles = ['../data_products/072723_weno_g10_profiles_all2.pkl']
+  #listOfPickles = ['../data_products/072723_test_combine_outer_ann_profiles_all2.pkl']
+  #listOfPickles = ['../data_products/072823_64_weno_profiles_all2.pkl']
+  listOfPickles = ['../data_products/073123_64_weno_g10_profiles_all2.pkl']
+  #listOfPickles = ['../data_products/073023_moving_rin_profiles_all2.pkl']
   listOfLabels = None
   plot_dir = "../plots/test"
   cta=0 # time evolution
   avg_frac=0.5
   show_rscale=True
-  num_time_chunk=8 # 4
-  boxcar_factor=2 #4
+  num_time_chunk=4 #8 #
+  boxcar_factor=0 #4 #2 #
   colors=None
+  xlim=[2,2e8]
 
   # colors, linestyles, directory
   linestyles=['-',':',':',':',':', '--', ':']
