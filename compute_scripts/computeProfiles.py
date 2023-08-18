@@ -31,7 +31,11 @@ def shellAverage(dump, quantity, imin=0, mass_weight=True):
     density = 1.0
 
   if dump['n3'] > 1: #3d
-    return np.sum(to_average[imin:,:,:] * volumetric_weight * density, axis=(1,2)) / np.sum(volumetric_weight * density, axis=(1,2))
+    #return np.sum(to_average[imin:,:,:] * volumetric_weight * density, axis=(1,2)) / np.sum(volumetric_weight * density, axis=(1,2))
+    if quantity=="Edot" or quantity=="Mdot": # include the poles only for the conserved quantities
+        return np.sum((to_average * volumetric_weight * density)[imin:,:,:], axis=(1,2)) / np.sum((volumetric_weight * density)[imin:,:,:], axis=(1,2))
+    else:
+        return np.sum((to_average * volumetric_weight * density)[imin:,1:-1,:], axis=(1,2)) / np.sum((volumetric_weight * density)[imin:,1:-1,:], axis=(1,2))
   else:
     return np.sum(to_average[imin:,:] * volumetric_weight * density, axis=1) / np.sum(volumetric_weight * density, axis=1)
 
@@ -117,7 +121,7 @@ def computeAllProfiles(runName, outPickleName, quantities=['Mdot', 'rho', 'u', '
       if r_sonic is None:
         r_sonic = dump['rs']
       if base is None:
-        base = int(dump['base'])
+        base = float(dump['base'])
       
       listOfProfiles.append(computeProfileSet(dump, quantities=quantities, mass_weight=mass_weight))
       listOfTimes.append(pyharm.io.get_dump_time(file))

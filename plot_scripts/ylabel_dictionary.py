@@ -16,7 +16,8 @@ ylabel_dictionary['eta'] = r'$\eta = (\dot{M}-\dot{E})/\dot{M}_{10}$'
 ylabel_dictionary['etaMdot'] = r'$\dot{M}-\dot{E}$'
 ylabel_dictionary['beta'] = r'$\beta$'
 ylabel_dictionary['sigma'] = r'$\sigma$'
-ylabel_dictionary['Omega'] = '$\Omega$'
+ylabel_dictionary['Omega'] = r'$|\Omega = u^\phi/u^t| /\Omega_K$'
+ylabel_dictionary['Pg'] = r'$P_{\rm gas}$'
 
 def variableToLabel(variable):
   try:
