@@ -49,9 +49,12 @@ def plotProfilesMultipanel(listOfPickles, listOfLabels=None, listOfColors=None, 
         fig.savefig(output,bbox_inches='tight')
         plt.close(fig)
 
-if __name__ == '__main__':
-    listOfPickles = ['../data_products/'+dirname for dirname in ['bondi_multizone_030723_bondi_128^3_profiles_all.pkl', 'production_runs/gizmo_extg_1e8_profiles_all.pkl']]# 'bondi_multizone_022823_bondi_new_coord_noffp_profiles.pkl', 'bondi_multizone_040223_gizmo_ext_g_64^3_lin_profiles.pkl', 'bondi_multizone_032723_gizmo_no_ext_g_64^3_lin_profiles.pkl', 'bondi_multizone_040423_bondi_64^3_rot_profiles.pkl']]
+def plotHydro():
+    listOfPickles = ['../data_products/'+dirname for dirname in ['bondi_multizone_030723_bondi_128^3_profiles_all.pkl', 'production_runs/gizmo_extg_1e8_profiles_all.pkl']]
     listOfLabels = [r'Bondi $\S \, 3.1$', r'Ext.Grav. $\S 3.2$', 'Bondi+Ext.Profiles', 'Bondi+Rot.']
     listOfColors = ['k', 'tab:blue', 'tab:orange', 'tab:green']
     listOfLinestyles = ['solid', 'dashed', 'dashdot', 'dotted']
     plotProfilesMultipanel(listOfPickles, listOfLabels=listOfLabels, listOfColors=listOfColors, listOfLinestyles=listOfLinestyles, output='../plots/combined_profiles.pdf')
+
+if __name__ == '__main__':
+    plotHydro()
