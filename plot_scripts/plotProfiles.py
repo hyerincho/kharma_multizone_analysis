@@ -431,7 +431,7 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
     xlim = ax.get_xlim()
     r_bondi = np.logspace(np.log10(max(2,xlim[0])), np.log10(xlim[1]), 50)
     analytic_sol = bondi.get_quantity_for_rarr(r_bondi, quantity, rs=r_sonic)
-    if analytic_sol is not None and not rescale and rescale_value > 1:
+    if analytic_sol is not None and not rescale:
       ax.plot(r_bondi, analytic_sol, color='slategrey',label='bondi analytic', lw=6, ls='-', zorder=-100,alpha=0.5)
     rb = 1e5
     #rho0 = bondi.get_quantity_for_rarr([1e8], quantity, rs=r_sonic)

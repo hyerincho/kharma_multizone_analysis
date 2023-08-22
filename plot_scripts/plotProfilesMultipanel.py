@@ -26,13 +26,14 @@ def plotProfilesMultipanel(listOfPickles, listOfLabels=None, listOfColors=None, 
         listOfLinestyles = [None]*len(listOfPickles)
 
     for col in range(ax1d.shape[0]):
+        do_rescale = ('Mdot' in quantities[col] and rescaleValue != 1)
         ax = ax1d[col]
         plotProfiles(listOfPickles, quantities[col], formatting=False, finish=False, label_list=listOfLabels, color_list=listOfColors, linestyle_list=listOfLinestyles, fig_ax=(fig, ax1d[col]), \
                 flip_sign=(quantities[col] in ['u^r']), show_init=1, show_gizmo=show_gizmo, show_bondi=1, show_rscale=show_rscale, cycles_to_average=cta, show_divisions=0, show_rb=1, \
-                rescale=(quantities[col] in ['Mdot']), rescale_value=rescaleValue, num_time_chunk=1, boxcar_factor=boxcar_factor) #
+                rescale=do_rescale, rescale_value=rescaleValue, num_time_chunk=1, boxcar_factor=boxcar_factor) #
         ax.set_xscale('log')
         ax.set_yscale('log')
-        if 'Mdot' in quantities[col] and rescaleValue!=1:
+        if do_rescale:
             ax.set_title(variableToLabel(quantities[col]).replace('arb. units', r'$\dot{M}_B$'))
         else: ax.set_title(variableToLabel(quantities[col]), fontsize=fontsize)
         ax.set_xlim(xlim)
@@ -84,5 +85,5 @@ def plotMHD():
             lgd_ax=1, output='../plots/combined_profiles.pdf')
 
 if __name__ == '__main__':
-    #plotHydro()
-    plotMHD()
+    plotHydro()
+    #plotMHD()
