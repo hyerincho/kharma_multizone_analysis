@@ -15,16 +15,26 @@ def shellAverage(dump, quantity, imin=0, mass_weight=True):
   if quantity == 'Mdot':
     #This is the weirdest one.  We won't average ourselves, and we'll use a built-in pyharm function.
     return -pyharm.shell_sum(dump, 'FM')
+  if quantity == 'Mdot_in':
+    to_sum = np.copy(dump["FM"])
+    to_sum[to_sum>0] = 0
+    return -pyharm.shell_sum(dump, to_sum)
+  if quantity == 'Mdot_out':
+    to_sum = np.copy(dump["FM"])
+    to_sum[to_sum<0] = 0
+    return -pyharm.shell_sum(dump, to_sum)
   if quantity == 'Edot':
     return -pyharm.shell_sum(dump, 'FE')
   if quantity == 'T':
     to_average = dump['u'] / dump['rho'] * (dump['gam']-1)
+  #elif quantity == 'Omega':
+  #  to_average = dump['u^phi']/dump['u^t']
   else:
     to_average = dump[quantity]
 
   #Weighting for the average.
   volumetric_weight = dump['gdet']
-  if mass_weight:
+  if mass_weight and quantity != 'rho':
     density = dump['rho']
   else:
     #Obviously it isn't, but basically we just want to pretend this doesn't exist.
@@ -173,4 +183,4 @@ if __name__ == '__main__':
 
   inName = os.path.join(grmhdLocation, run)
   outName = os.path.join(dataLocation, run + '_profiles_all2.pkl')
-  computeAllProfiles(inName, outName, quantities=['Edot', 'Mdot', 'rho', 'u', 'T', 'abs_u^r', 'u^phi', 'u^th', 'u^r','abs_u^th', 'abs_u^phi', 'u^t', 'b', 'inv_beta', 'beta'], final_only=False, onezone_override=('onezone' in inName))
+  computeAllProfiles(inName, outName, quantities=['Edot', 'Mdot', 'Mdot_in','Mdot_out', 'rho', 'u', 'T', 'abs_u^r', 'u^phi', 'u^th', 'u^r','abs_u^th', 'abs_u^phi', 'u^t', 'b', 'inv_beta', 'beta', 'Omega', 'abs_Omega', 'K'], final_only=False, onezone_override=('onezone' in inName))

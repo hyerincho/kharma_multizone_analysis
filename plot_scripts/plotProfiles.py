@@ -262,6 +262,10 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
       else: ONEZONE = False
       
       factor = 2 #np.sqrt(2) #2 #  1.1 # 
+      rescalingFactor = 1.0
+      if rescale:
+        #Find rescaling factor.
+        rescalingFactor = 1./rescale_value
       if quantity == 'eta':
           profiles, invert = readQuantity(D, 'Edot')
           tDivList, usableProfiles_num, r_save, num_save = assignTimeBins(D, profiles, ONEZONE, num_time_chunk, zone_time_average_fraction, factor)
@@ -348,7 +352,7 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
                   mask[:int(n_radii/4)] = False
 
           r_plot = np.concatenate([r_plot,r_save[zone][mask]])
-          values_plot = np.concatenate([values_plot,plottable[mask]*(-1)**int(flip_sign)])
+          values_plot = np.concatenate([values_plot,rescalingFactor*plottable[mask]*(-1)**int(flip_sign)])
 
         r_plot = np.squeeze(np.array(r_plot))
         values_plot = np.squeeze(np.array(values_plot))
@@ -414,9 +418,9 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
   elif show_rscale:
     # show density scalings
     if "rho" in quantity: # and "rot" in dirtag:
-        rarr= np.logspace(np.log10(2),np.log10(r_sonic**2.*1000),20)
-        factor=1e-5#7e-7
-        ax.plot(rarr,np.power(rarr/1e3,-1)*factor,'g-',alpha=0.3,lw=10,label=r'$r^{-1}$')
+        rarr= np.logspace(np.log10(2),np.log10(r_sonic**2./10),20) #*1000
+        factor=1e-8#7e-7
+        ax.plot(rarr,np.power(rarr/1e3,-1)*factor,'g-',alpha=0.3,lw=6,label=r'$r^{-1}$')
         #ax.plot(rarr,np.power(rarr/1e3,-1.5)*factor,'g:',alpha=0.3,lw=10,label=r'$r^{-1.5}$')
         #rb=1e5
         #rho0=np.power(3e-6,1.5)
@@ -427,7 +431,7 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
     xlim = ax.get_xlim()
     r_bondi = np.logspace(np.log10(max(2,xlim[0])), np.log10(xlim[1]), 50)
     analytic_sol = bondi.get_quantity_for_rarr(r_bondi, quantity, rs=r_sonic)
-    if analytic_sol is not None:
+    if analytic_sol is not None and not rescale and rescale_value > 1:
       ax.plot(r_bondi, analytic_sol, color='slategrey',label='bondi analytic', lw=6, ls='-', zorder=-100,alpha=0.5)
     rb = 1e5
     #rho0 = bondi.get_quantity_for_rarr([1e8], quantity, rs=r_sonic)
