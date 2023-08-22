@@ -13,7 +13,7 @@ import os
 #variableToLatex['T'] = '$\Theta = k\,T/(\mu\, c^2)$'
 
 def plotProfilesMultipanel(listOfPickles, listOfLabels=None, listOfColors=None, listOfLinestyles=None, output=None, quantities=['Mdot', 'rho', 'T', 'u^r'], figsize=(10,8), rescale=False, rescaleRadius=10, rescaleValue=1, \
-    fontsize=18, xlim=(2,4e9), ylim=(1e-2,10), show_gizmo=True, cta=10, boxcar_factor=0, show_rscale=False, lgd_ax=0):
+    fontsize=18, xlim=(2,4e9), ylim=(1e-2,10), show_gizmo=True, cta=10, boxcar_factor=0, show_rscale=False, show_mdotinout=False, lgd_ax=0):
 
     row = 2
     fig, axarr = plt.subplots(row, len(quantities)//row, figsize=figsize, sharex=True)
@@ -28,9 +28,17 @@ def plotProfilesMultipanel(listOfPickles, listOfLabels=None, listOfColors=None, 
     for col in range(ax1d.shape[0]):
         do_rescale = ('Mdot' in quantities[col] and rescaleValue != 1)
         ax = ax1d[col]
-        plotProfiles(listOfPickles, quantities[col], formatting=False, finish=False, label_list=listOfLabels, color_list=listOfColors, linestyle_list=listOfLinestyles, fig_ax=(fig, ax1d[col]), \
-                flip_sign=(quantities[col] in ['u^r']), show_init=1, show_gizmo=show_gizmo, show_bondi=1, show_rscale=show_rscale, cycles_to_average=cta, show_divisions=0, show_rb=1, \
+        plotProfiles(listOfPickles, quantities[col], formatting=False, finish=False, label_list=listOfLabels, color_list=listOfColors, linestyle_list=listOfLinestyles, fig_ax=(fig, ax), \
+                flip_sign=(quantities[col] in ['u^r']), show_init=1, show_gizmo=show_gizmo, show_bondi=1, show_rscale=show_rscale, show_mdotinout=show_mdotinout, cycles_to_average=cta, show_divisions=0, show_rb=1, \
                 rescale=do_rescale, rescale_value=rescaleValue, num_time_chunk=1, boxcar_factor=boxcar_factor) #
+        if show_mdotinout and quantities[col] == "Mdot":
+            plotProfiles(listOfPickles, 'Mdot_in', formatting=False, finish=False, label_list=[r'$\dot{M}_{\rm in}$'], color_list=['b'], linestyle_list=listOfLinestyles, fig_ax=(fig, ax), \
+                    flip_sign=(quantities[col] in ['u^r']), show_init=1, show_gizmo=show_gizmo, show_bondi=1, show_rscale=show_rscale, show_mdotinout=show_mdotinout, cycles_to_average=cta, show_divisions=0, show_rb=1, \
+                    rescale=do_rescale, rescale_value=rescaleValue, num_time_chunk=1, boxcar_factor=boxcar_factor) #
+            plotProfiles(listOfPickles, 'Mdot_out', formatting=False, finish=False, label_list=[r'$\dot{M}_{\rm out}$'], color_list=['r'], linestyle_list=listOfLinestyles, fig_ax=(fig, ax), \
+                    flip_sign=(quantities[col] in ['u^r']), show_init=1, show_gizmo=show_gizmo, show_bondi=1, show_rscale=show_rscale, show_mdotinout=show_mdotinout, cycles_to_average=cta, show_divisions=0, show_rb=1, \
+                    rescale=do_rescale, rescale_value=rescaleValue, num_time_chunk=1, boxcar_factor=boxcar_factor) #
+            ax.legend(loc='best', frameon=False, fontsize=fontsize-4)
         ax.set_xscale('log')
         ax.set_yscale('log')
         if do_rescale:
@@ -48,9 +56,9 @@ def plotProfilesMultipanel(listOfPickles, listOfLabels=None, listOfColors=None, 
     
     for col in range(axarr.shape[1]): axarr[-1,col].set_xlabel('$r \ [r_g]$', fontsize=fontsize)
 
-    for run_index in range(len(listOfPickles)):
-        ax1d[lgd_ax].plot([], [], color=listOfColors[run_index], lw=2, label=listOfLabels[run_index], ls=listOfLinestyles[run_index])
-        ax1d[lgd_ax].legend(loc='best', frameon=False, fontsize=fontsize-4)
+    #for run_index in range(len(listOfPickles)):
+    #    ax1d[lgd_ax].plot([], [], color=listOfColors[run_index], lw=2, label=listOfLabels[run_index], ls=listOfLinestyles[run_index])
+    ax1d[lgd_ax].legend(loc='best', frameon=False, fontsize=fontsize-4)
 
     fig.tight_layout()
     plt.subplots_adjust(wspace=0.2,hspace=0.2)
@@ -69,11 +77,12 @@ def plotHydro():
     plotProfilesMultipanel(listOfPickles, listOfLabels=listOfLabels, listOfColors=listOfColors, listOfLinestyles=listOfLinestyles, xlim=xlim, output='../plots/combined_profiles.pdf')
 
 def plotMHD():
-    listOfPickles = ['../data_products/'+dirname for dirname in ['081723_rst64_longtin_save_profiles_all2.pkl']]
+    listOfPickles = ['../data_products/'+dirname for dirname in ['081723_rst64_longtin_profiles_all2.pkl']]
     listOfLabels = ['__nolegend__']
     listOfColors = ['k', 'tab:blue', 'tab:orange', 'tab:green']
     listOfLinestyles = ['solid', 'dashed', 'dashdot', 'dotted']
     quantities = ['Mdot', 'rho', 'T', 'abs_Omega', 'eta', 'beta'] #, 'abs_Omega'
+    figsize=(14,8)
     xlim = (2, 2e8)
     ylim = (1e-4,2)
     cta= 0
@@ -81,9 +90,9 @@ def plotMHD():
     boxcar_factor = 4
     lgd_ax=1
     plotProfilesMultipanel(listOfPickles, listOfLabels=listOfLabels, listOfColors=listOfColors, listOfLinestyles=listOfLinestyles, \
-            xlim=xlim, ylim=ylim, show_gizmo=False, show_rscale=True, quantities=quantities, rescaleValue=rescaleValue, cta=cta, boxcar_factor=boxcar_factor,\
+            xlim=xlim, ylim=ylim, show_gizmo=False, show_rscale=True, show_mdotinout=True, figsize=figsize, quantities=quantities, rescaleValue=rescaleValue, cta=cta, boxcar_factor=boxcar_factor,\
             lgd_ax=1, output='../plots/combined_profiles.pdf')
 
 if __name__ == '__main__':
-    plotHydro()
-    #plotMHD()
+    #plotHydro()
+    plotMHD()

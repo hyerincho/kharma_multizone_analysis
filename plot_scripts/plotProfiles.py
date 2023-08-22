@@ -116,7 +116,7 @@ def assignTimeBins(D, profiles, ONEZONE=False, num_time_chunk=4, zone_time_avera
   return tDivList, usableProfiles, r_save, num_save
 
 def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_list=None, linestyle_list=None, figsize=(8,6), flip_sign=False, show_divisions=True, show_rb=False, zone_time_average_fraction=0, 
-  xlabel=None, ylabel=None, xlim=None, ylim=None, label_list=None, fig_ax=None, formatting=True, finish=True, rescale=False, rescale_radius=10, rescale_value=1, cycles_to_average=1, trim_zone=True, show_init=False, show_gizmo=False, show_bondi=False, show_rscale=False, num_time_chunk=4, boxcar_factor=0):
+  xlabel=None, ylabel=None, xlim=None, ylim=None, label_list=None, fig_ax=None, formatting=True, finish=True, rescale=False, rescale_radius=10, rescale_value=1, cycles_to_average=1, trim_zone=True, show_init=False, show_gizmo=False, show_bondi=False, show_rscale=False, show_mdotinout=False, num_time_chunk=4, boxcar_factor=0):
 
   if isinstance(listOfPickles, str):
     listOfPickles = [listOfPickles]
@@ -418,7 +418,7 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
   elif show_rscale:
     # show density scalings
     if "rho" in quantity: # and "rot" in dirtag:
-        rarr= np.logspace(np.log10(2),np.log10(r_sonic**2./10),20) #*1000
+        rarr= np.logspace(np.log10(2),np.log10(r_sonic**2./100),20) #*1000
         factor=1e-8#7e-7
         ax.plot(rarr,np.power(rarr/1e3,-1)*factor,'g-',alpha=0.3,lw=6,label=r'$r^{-1}$')
         #ax.plot(rarr,np.power(rarr/1e3,-1.5)*factor,'g:',alpha=0.3,lw=10,label=r'$r^{-1.5}$')

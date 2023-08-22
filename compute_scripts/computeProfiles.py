@@ -37,8 +37,7 @@ def shellAverage(dump, quantity, imin=0, mass_weight=True):
   if mass_weight and quantity != 'rho':
     density = dump['rho']
   else:
-    #Obviously it isn't, but basically we just want to pretend this doesn't exist.
-    density = 1.0
+    density = dump['1'] #1.0
 
   if dump['n3'] > 1: #3d
     #return np.sum(to_average[imin:,:,:] * volumetric_weight * density, axis=(1,2)) / np.sum(volumetric_weight * density, axis=(1,2))
