@@ -73,7 +73,8 @@ def assignTimeBins(D, profiles, ONEZONE=False, num_time_chunk=4, zone_time_avera
   for i,profile in enumerate(profiles):
     times = D["times"][i]
     run_idx = D["runIndices"][i]
-    iteration = np.maximum(np.ceil(run_idx/(n_zones_eff-1)),1)
+    if n_zones_eff == 1: iteration = 0
+    else: iteration = np.maximum(np.ceil(run_idx/(n_zones_eff-1)),1)
     if 1: #iteration % 2 == 1 or run_idx % (n_zones-1)==0: # selecting only outwards direction
         if len(times)<1:
             #pdb.set_trace()
@@ -418,8 +419,8 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
   elif show_rscale:
     # show density scalings
     if "rho" in quantity: # and "rot" in dirtag:
-        rarr= np.logspace(np.log10(2),np.log10(r_sonic**2./100),20) #*1000
-        factor=1e-8#7e-7
+        rarr= np.logspace(np.log10(2),np.log10(r_sonic),20) #*1000
+        factor=1e-8*1e5/r_sonic**2#7e-7
         ax.plot(rarr,np.power(rarr/1e3,-1)*factor,'g-',alpha=0.3,lw=6,label=r'$r^{-1}$')
         #ax.plot(rarr,np.power(rarr/1e3,-1.5)*factor,'g:',alpha=0.3,lw=10,label=r'$r^{-1.5}$')
         #rb=1e5
@@ -482,6 +483,7 @@ if __name__ == '__main__':
   '''
 
   # 1b&c) GIZMO
+  '''
   listOfPickles = ['../data_products/production_runs/gizmo_extg_1e8_profiles_all.pkl', '../data_products/bondi_multizone_052523_gizmo_n8_64^3_noshock_profiles_all.pkl']
   listOfLabels = ['ext. g.', 'no ext. g.']
   plot_dir = '../plots/052923_gizmo'
@@ -493,6 +495,7 @@ if __name__ == '__main__':
 
   xlim=[2,4e9]
   colors = ['tab:blue', 'tab:red', 'k','r', 'b',  'g', 'm', 'c', 'y']
+  '''
 
   # 2a) weak field test (n=4)
   '''
@@ -578,8 +581,8 @@ if __name__ == '__main__':
   '''
 
   # test
-  '''
   #listOfPickles = ['../data_products/production_runs/072823_beta01_128_profiles_all2.pkl']
+  listOfPickles = ['../data_products/production_runs/072823_beta01_onezone_profiles_all2.pkl']
   #listOfPickles = ['../data_products/072623_bugfixed_jitall_profiles_all2.pkl']
   #listOfPickles = ['../data_products/072723_weno_g10_profiles_all2.pkl']
   #listOfPickles = ['../data_products/072723_test_combine_outer_ann_profiles_all2.pkl']
@@ -590,25 +593,26 @@ if __name__ == '__main__':
   #listOfPickles = ['../data_products/080623_rst64_profiles_all2.pkl']
   ##listOfPickles = ['../data_products/080823_rst64_testb64_profiles_all2.pkl']
   #listOfPickles = ['../data_products/081623_rst128_profiles_all2.pkl']
-  listOfPickles = ['../data_products/081723_rst64_longtin_-1_profiles_all2.pkl']
+  #listOfPickles = ['../data_products/081723_rst64_longtin_-1_profiles_all2.pkl']
   #listOfPickles = ['../data_products/081723_moving_rin_smallbase_profiles_all2.pkl']
   #listOfPickles = ['../data_products/081823_gam43_profiles_all2.pkl']
+  #listOfPickles = ['../data_products/082223_rst64_longtin4_profiles_all2.pkl']
   listOfLabels = None
   plot_dir = "../plots/test"
   cta=0 # time evolution
   avg_frac=0.5
   show_rscale=True
-  num_time_chunk=4 #8 #4 #2 #
+  num_time_chunk=1 #8 #4 #2 #
   boxcar_factor=0 #4 #2 #
   colors=None
   xlim=[2,2e8]
-  '''
+  show_div=False # temp
 
   # colors, linestyles, directory
   linestyles=['-','-',':',':',':', '--', ':']
   os.makedirs(plot_dir, exist_ok=True)
 
-  for quantity in ['eta', 'etaMdot', 'beta', 'Edot', 'Mdot', 'rho', 'u', 'T', 'abs_u^r', 'abs_u^phi', 'abs_u^th', 'u^r', 'u^phi',  'u^th', 'K']: #'abs_Omega', 'Pg'
+  for quantity in ['eta', 'etaMdot', 'beta', 'Edot', 'Mdot', 'rho', 'u', 'T', 'abs_u^r', 'abs_u^phi', 'abs_u^th', 'u^r', 'u^phi',  'u^th']: #'abs_Omega', 'Pg', 'K'
     output = plot_dir+"/profile_"+quantity+".pdf"
     #output = None
     ylim = [None,[1e-4,10]][(quantity in ['Mdot'])] # [1e-3,10] if Mdot, None otherwise

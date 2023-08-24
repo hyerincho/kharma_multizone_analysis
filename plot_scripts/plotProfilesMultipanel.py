@@ -12,7 +12,7 @@ import os
 #variableToLatex['u^r'] = '$u^r$'
 #variableToLatex['T'] = '$\Theta = k\,T/(\mu\, c^2)$'
 
-def plotProfilesMultipanel(listOfPickles, listOfLabels=None, listOfColors=None, listOfLinestyles=None, output=None, quantities=['Mdot', 'rho', 'T', 'u^r'], figsize=(10,8), rescale=False, rescaleRadius=10, rescaleValue=1, \
+def plotProfilesMultipanel(listOfPickles, listOfLabels=None, listOfColors=None, listOfLinestyles=None, output=None, quantities=['Mdot', 'rho', 'T', 'u^r'], figsize=(12,8), rescale=False, rescaleRadius=10, rescaleValue=1, \
     fontsize=18, xlim=(2,4e9), ylim=(1e-2,10), show_gizmo=True, cta=10, boxcar_factor=0, show_rscale=False, show_mdotinout=False, lgd_ax=0):
 
     row = 2
@@ -76,6 +76,21 @@ def plotHydro():
     xlim = (2, 4e9)
     plotProfilesMultipanel(listOfPickles, listOfLabels=listOfLabels, listOfColors=listOfColors, listOfLinestyles=listOfLinestyles, xlim=xlim, output='../plots/combined_profiles.pdf')
 
+def plotMHDtest():
+    listOfPickles = ['../data_products/'+dirname for dirname in ['production_runs/072823_beta01_onezone_profiles_all2.pkl', '071023_n3_beta01_profiles_all2.pkl']]
+    listOfLabels = ['1-zone', '3-zone']
+    listOfColors = ['k', 'tab:blue', 'tab:orange', 'tab:green']
+    listOfLinestyles = ['solid', 'solid', 'dashdot', 'dotted']
+    quantities = ['Mdot', 'rho', 'eta', 'beta'] #, 'abs_Omega', 'T'
+    xlim = (2, 5e3)
+    ylim = (1e-4,2)
+    cta= 0
+    rescaleValue = bondi.get_quantity_for_rarr([1e3], 'Mdot', rs=16)[0]
+    boxcar_factor = 0 #4
+    lgd_ax=1
+    plotProfilesMultipanel(listOfPickles, listOfLabels=listOfLabels, listOfColors=listOfColors, listOfLinestyles=listOfLinestyles, \
+            xlim=xlim, ylim=ylim, show_gizmo=False, show_rscale=True, quantities=quantities, rescaleValue=rescaleValue, cta=cta, boxcar_factor=boxcar_factor,\
+            lgd_ax=1, output='../plots/combined_profiles.pdf')
 def plotMHD():
     listOfPickles = ['../data_products/'+dirname for dirname in ['081723_rst64_longtin_profiles_all2.pkl']]
     listOfLabels = ['__nolegend__']
@@ -95,4 +110,5 @@ def plotMHD():
 
 if __name__ == '__main__':
     #plotHydro()
-    plotMHD()
+    plotMHDtest()
+    #plotMHD()
