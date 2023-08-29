@@ -5,6 +5,19 @@ from matplotlib_settings import *
 from ylabel_dictionary import *
 import pickle
 import os
+from astropy import units as u
+from astropy import constants as const
+
+G = const.G
+c = const.c
+
+def rg2kpc(r,M=6.5e9*u.Msun):
+    rg = G*M/c**2
+    return (r*rg).to('kpc').value
+
+def kpc2rg(R,M=6.5e9*u.Msun):
+    rg = G*M/c**2
+    return (R*u.kpc/rg).to('')
 
 #variableToLatex = {}
 #variableToLatex['Mdot'] = '$\dot{M}$ [arbitrary units]'
@@ -13,7 +26,7 @@ import os
 #variableToLatex['T'] = '$\Theta = k\,T/(\mu\, c^2)$'
 
 def plotProfilesMultipanel(listOfPickles, listOfLabels=None, listOfColors=None, listOfLinestyles=None, output=None, quantities=['Mdot', 'rho', 'T', 'u^r'], figsize=(12,8), rescale=False, rescaleRadius=10, rescaleValue=1, \
-    fontsize=18, xlim=(2,4e9), ylim=(1e-2,10), show_gizmo=True, cta=10, boxcar_factor=0, show_rscale=False, show_mdotinout=False, lgd_ax=0):
+    fontsize=18, xlim=(2,4e9), ylim=(1e-2,10), show_init=True, show_gizmo=True, cta=10, boxcar_factor=0, average_factor=2, show_rscale=False, show_mdotinout=False, show_pc=False):
 
     row = 2
     fig, axarr = plt.subplots(row, len(quantities)//row, figsize=figsize, sharex=True)
@@ -25,43 +38,63 @@ def plotProfilesMultipanel(listOfPickles, listOfLabels=None, listOfColors=None, 
     if listOfLinestyles is None:
         listOfLinestyles = [None]*len(listOfPickles)
 
+    if show_pc:
+        r_bondi = np.logspace(np.log10(max(2,xlim[0])), np.log10(xlim[1]), 50)
+        for ax in axarr[0,:]:
+            ax.plot(r_bondi, np.zeros(len(r_bondi)))
+            secax = ax.secondary_xaxis('top', functions=(rg2kpc, kpc2rg))
+            secax.set_xlabel('R [kpc]',fontsize=fontsize)
+            secax.tick_params(axis='x', labelsize=fontsize-4)
     for col in range(ax1d.shape[0]):
         do_rescale = ('Mdot' in quantities[col] and rescaleValue != 1)
         ax = ax1d[col]
-        plotProfiles(listOfPickles, quantities[col], formatting=False, finish=False, label_list=listOfLabels, color_list=listOfColors, linestyle_list=listOfLinestyles, fig_ax=(fig, ax), \
-                flip_sign=(quantities[col] in ['u^r']), show_init=1, show_gizmo=show_gizmo, show_bondi=1, show_rscale=show_rscale, show_mdotinout=show_mdotinout, cycles_to_average=cta, show_divisions=0, show_rb=1, \
-                rescale=do_rescale, rescale_value=rescaleValue, num_time_chunk=1, boxcar_factor=boxcar_factor) #
+        if col == 0: label_list = listOfLabels
+        else: label_list = ['__nolegend__']*len(listOfPickles)
+        plotProfiles(listOfPickles, quantities[col], formatting=False, finish=False, label_list=label_list, color_list=listOfColors, linestyle_list=listOfLinestyles, fig_ax=(fig, ax), \
+                flip_sign=(quantities[col] in ['u^r']), show_init=show_init, show_gizmo=show_gizmo, show_bondi=1, show_rscale=show_rscale, show_mdotinout=show_mdotinout, cycles_to_average=cta, show_divisions=0, show_rb=1, \
+                rescale=do_rescale, rescale_value=rescaleValue, num_time_chunk=1, boxcar_factor=boxcar_factor, average_factor=average_factor) #
         if show_mdotinout and quantities[col] == "Mdot":
             plotProfiles(listOfPickles, 'Mdot_in', formatting=False, finish=False, label_list=[r'$\dot{M}_{\rm in}$'], color_list=['b'], linestyle_list=listOfLinestyles, fig_ax=(fig, ax), \
-                    flip_sign=(quantities[col] in ['u^r']), show_init=1, show_gizmo=show_gizmo, show_bondi=1, show_rscale=show_rscale, show_mdotinout=show_mdotinout, cycles_to_average=cta, show_divisions=0, show_rb=1, \
+                    flip_sign=(quantities[col] in ['u^r']), show_init=0, show_gizmo=show_gizmo, show_bondi=1, show_rscale=show_rscale, show_mdotinout=show_mdotinout, cycles_to_average=cta, show_divisions=0, show_rb=1, \
                     rescale=do_rescale, rescale_value=rescaleValue, num_time_chunk=1, boxcar_factor=boxcar_factor) #
             plotProfiles(listOfPickles, 'Mdot_out', formatting=False, finish=False, label_list=[r'$\dot{M}_{\rm out}$'], color_list=['r'], linestyle_list=listOfLinestyles, fig_ax=(fig, ax), \
-                    flip_sign=(quantities[col] in ['u^r']), show_init=1, show_gizmo=show_gizmo, show_bondi=1, show_rscale=show_rscale, show_mdotinout=show_mdotinout, cycles_to_average=cta, show_divisions=0, show_rb=1, \
+                    flip_sign=(quantities[col] in ['u^r']), show_init=0, show_gizmo=show_gizmo, show_bondi=1, show_rscale=show_rscale, show_mdotinout=show_mdotinout, cycles_to_average=cta, show_divisions=0, show_rb=1, \
                     rescale=do_rescale, rescale_value=rescaleValue, num_time_chunk=1, boxcar_factor=boxcar_factor) #
             ax.legend(loc='best', frameon=False, fontsize=fontsize-4)
+        ax.tick_params(axis='both', labelsize=fontsize-4)
         ax.set_xscale('log')
         ax.set_yscale('log')
         if do_rescale:
             ax.set_title(variableToLabel(quantities[col]).replace('arb. units', r'$\dot{M}_B$'))
-        else: ax.set_title(variableToLabel(quantities[col]), fontsize=fontsize)
+        else: 
+            if show_pc:
+                ax.set_ylabel(variableToLabel(quantities[col]), fontsize=fontsize)
+            else:
+                ax.set_title(variableToLabel(quantities[col]), fontsize=fontsize)
         ax.set_xlim(xlim)
         if quantities[col] == 'Mdot':
             ax.set_ylim(ylim)
-        elif quantities[col] == 'eta':
-            ax.set_ylim([1e-4,1])
-        elif quantities[col] == 'beta':
-            ax.set_ylim([1e-2,10])
+        #elif quantities[col] == 'eta':
+        #    ax.set_ylim([1e-4,1])
+        #elif quantities[col] == 'beta':
+        #    ax.set_ylim([1e-2,10])
         elif quantities[col] == 'abs_Omega':
             ax.set_ylim([1e-3,10])
     
     for col in range(axarr.shape[1]): axarr[-1,col].set_xlabel('$r \ [r_g]$', fontsize=fontsize)
 
+
     #for run_index in range(len(listOfPickles)):
     #    ax1d[lgd_ax].plot([], [], color=listOfColors[run_index], lw=2, label=listOfLabels[run_index], ls=listOfLinestyles[run_index])
-    ax1d[lgd_ax].legend(loc='best', frameon=False, fontsize=fontsize-4)
+    if len(quantities) > 4: handlelength=2
+    else: handlelength=5
+    for i in range(2): ax1d[i].legend(loc='best', frameon=False, fontsize=fontsize-4, handlelength=handlelength)
 
     fig.tight_layout()
-    plt.subplots_adjust(wspace=0.2,hspace=0.2)
+    if show_pc:
+        plt.subplots_adjust(wspace=0.23,hspace=0.01)
+    else:
+        plt.subplots_adjust(wspace=0.2,hspace=0.2)
     if output is None:
         fig.show()
     else:
@@ -71,26 +104,26 @@ def plotProfilesMultipanel(listOfPickles, listOfLabels=None, listOfColors=None, 
 def plotHydro():
     listOfPickles = ['../data_products/'+dirname for dirname in ['bondi_multizone_030723_bondi_128^3_profiles_all.pkl', 'production_runs/gizmo_extg_1e8_profiles_all.pkl']]
     listOfLabels = [r'Bondi $\S \, 3.1$', r'Ext.Grav. $\S 3.2$', 'Bondi+Ext.Profiles', 'Bondi+Rot.']
-    listOfColors = ['k', 'tab:blue', 'tab:orange', 'tab:green']
+    listOfColors = ['tab:red', 'tab:blue', 'tab:orange', 'tab:green'] #'k', 
     listOfLinestyles = ['solid', 'dashed', 'dashdot', 'dotted']
     xlim = (2, 4e9)
-    plotProfilesMultipanel(listOfPickles, listOfLabels=listOfLabels, listOfColors=listOfColors, listOfLinestyles=listOfLinestyles, xlim=xlim, output='../plots/combined_profiles.pdf')
+    plotProfilesMultipanel(listOfPickles, listOfLabels=listOfLabels, listOfColors=listOfColors, listOfLinestyles=listOfLinestyles, xlim=xlim, show_pc=True, output='../plots/combined_profiles.pdf')
 
 def plotMHDtest():
-    listOfPickles = ['../data_products/'+dirname for dirname in ['production_runs/072823_beta01_onezone_profiles_all2.pkl', '071023_n3_beta01_profiles_all2.pkl']]
-    listOfLabels = ['1-zone', '3-zone']
-    listOfColors = ['k', 'tab:blue', 'tab:orange', 'tab:green']
-    listOfLinestyles = ['solid', 'solid', 'dashdot', 'dotted']
-    quantities = ['Mdot', 'rho', 'eta', 'beta'] #, 'abs_Omega', 'T'
-    xlim = (2, 5e3)
+    listOfPickles = ['../data_products/'+dirname for dirname in ['082423_2d_onezone_profiles_all2.pkl','082823_2d_n4_longtout_profiles_all2.pkl','production_runs/072823_beta01_onezone_profiles_all2.pkl', '082423_n4_profiles_all2.pkl']]# 
+    listOfLabels = [r'$\S \,4.1$ weak 1-zone', r'$\S \,4.1$ weak 4-zone',r'$\S \,4.2$ strong 1-zone', r'$\S \,4.2$ strong 4-zone']
+    listOfColors = ['tab:red','tab:orange','k', 'tab:blue', 'tab:orange', 'tab:green']
+    listOfLinestyles = ['solid','dashed', 'solid', 'solid','dashdot', 'dotted']
+    quantities = ['Mdot', 'rho', 'T', 'u^r', 'beta', 'eta'] #, 'abs_Omega', 'T'
+    xlim = (2, 4e4)
     ylim = (1e-4,2)
-    cta= 0
+    cta= 0 #10
     rescaleValue = bondi.get_quantity_for_rarr([1e3], 'Mdot', rs=16)[0]
     boxcar_factor = 0 #4
-    lgd_ax=1
     plotProfilesMultipanel(listOfPickles, listOfLabels=listOfLabels, listOfColors=listOfColors, listOfLinestyles=listOfLinestyles, \
-            xlim=xlim, ylim=ylim, show_gizmo=False, show_rscale=True, quantities=quantities, rescaleValue=rescaleValue, cta=cta, boxcar_factor=boxcar_factor,\
-            lgd_ax=1, output='../plots/combined_profiles.pdf')
+            xlim=xlim, ylim=ylim, show_init=False, show_gizmo=False, show_rscale=True, quantities=quantities, rescaleValue=rescaleValue, cta=cta, \
+            boxcar_factor=boxcar_factor, average_factor=np.sqrt(2), \
+            output='../plots/combined_profiles.pdf')
 def plotMHD():
     listOfPickles = ['../data_products/'+dirname for dirname in ['081723_rst64_longtin_profiles_all2.pkl']]
     listOfLabels = ['__nolegend__']
@@ -103,10 +136,9 @@ def plotMHD():
     cta= 0
     rescaleValue = bondi.get_quantity_for_rarr([1e5], 'Mdot', rs=np.sqrt(1e5))[0]
     boxcar_factor = 4
-    lgd_ax=1
     plotProfilesMultipanel(listOfPickles, listOfLabels=listOfLabels, listOfColors=listOfColors, listOfLinestyles=listOfLinestyles, \
             xlim=xlim, ylim=ylim, show_gizmo=False, show_rscale=True, show_mdotinout=True, figsize=figsize, quantities=quantities, rescaleValue=rescaleValue, cta=cta, boxcar_factor=boxcar_factor,\
-            lgd_ax=1, output='../plots/combined_profiles.pdf')
+            output='../plots/combined_profiles.pdf')
 
 if __name__ == '__main__':
     #plotHydro()
