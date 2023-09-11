@@ -15,22 +15,24 @@ def shellAverage(dump, quantity, imin=0, mass_weight=True):
   if quantity == 'Mdot':
     #This is the weirdest one.  We won't average ourselves, and we'll use a built-in pyharm function.
     return -pyharm.shell_sum(dump, 'FM')
-  if quantity == 'Mdot_in':
+  elif quantity == 'Mdot_in':
     to_sum = np.copy(dump["FM"])
     to_sum[to_sum>0] = 0
     return -pyharm.shell_sum(dump, to_sum)
-  if quantity == 'Mdot_out':
+  elif quantity == 'Mdot_out':
     to_sum = np.copy(dump["FM"])
     to_sum[to_sum<0] = 0
     return -pyharm.shell_sum(dump, to_sum)
-  if quantity == 'Edot':
+  elif quantity == 'Edot':
     return -pyharm.shell_sum(dump, 'FE')
-  if quantity == 'T':
+  elif quantity == 'T':
     to_average = dump['u'] / dump['rho'] * (dump['gam']-1)
-  #elif quantity == 'Omega':
-  #  to_average = dump['u^phi']/dump['u^t']
+  elif quantity == 'Phib':
+    return 0.5 * pyharm.shell_sum(dump, 'abs_B1') * np.sqrt(4.*np.pi)
   else:
     to_average = dump[quantity]
+  #elif quantity == 'Omega':
+  #  to_average = dump['u^phi']/dump['u^t']
 
   #Weighting for the average.
   volumetric_weight = dump['gdet']
@@ -127,6 +129,7 @@ def computeAllProfiles(runName, outPickleName, quantities=['Mdot', 'rho', 'u', '
         nzone = dump['nzone']
       try: nzone_eff = dump['nzone_eff']
       except: nzone_eff = nzone
+      if onezone_override: nzone_eff = nzone
       if r_sonic is None:
         r_sonic = dump['rs']
       if base is None:
@@ -182,4 +185,4 @@ if __name__ == '__main__':
 
   inName = os.path.join(grmhdLocation, run)
   outName = os.path.join(dataLocation, run + '_profiles_all2.pkl')
-  computeAllProfiles(inName, outName, quantities=['Edot', 'Mdot', 'Mdot_in','Mdot_out', 'rho', 'u', 'T', 'abs_u^r', 'u^phi', 'u^th', 'u^r','abs_u^th', 'abs_u^phi', 'u^t', 'b', 'inv_beta', 'beta', 'Omega', 'abs_Omega', 'K'], final_only=False, onezone_override=('onezone' in inName))
+  computeAllProfiles(inName, outName, quantities=['Edot', 'Mdot', 'Mdot_in','Mdot_out', 'rho', 'u', 'T', 'abs_u^r', 'u^phi', 'u^th', 'u^r','abs_u^th', 'abs_u^phi', 'u^t', 'b', 'inv_beta', 'beta', 'Omega', 'abs_Omega', 'K', 'Phib'], final_only=False, onezone_override=('onezone' in inName)) #

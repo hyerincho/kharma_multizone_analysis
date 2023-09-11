@@ -26,7 +26,7 @@ def kpc2rg(R,M=6.5e9*u.Msun):
 #variableToLatex['T'] = '$\Theta = k\,T/(\mu\, c^2)$'
 
 def plotProfilesMultipanel(listOfPickles, listOfLabels=None, listOfColors=None, listOfLinestyles=None, output=None, quantities=['Mdot', 'rho', 'T', 'u^r'], figsize=(12,8), rescale=False, rescaleRadius=10, rescaleValue=1, \
-    fontsize=18, xlim=(2,4e9), ylim=(1e-2,10), show_init=True, show_gizmo=True, cta=10, boxcar_factor=0, average_factor=2, show_rscale=False, show_mdotinout=False, show_pc=False):
+    fontsize=18, xlim=(2,4e9), ylim=(1e-2,10), show_init=True, show_gizmo=True, cta=10, boxcar_factor=0, average_factor=2, show_rscale=False, show_mdotinout=False, show_pc=False, set_beta_ylim=False):
 
     row = 2
     fig, axarr = plt.subplots(row, len(quantities)//row, figsize=figsize, sharex=True)
@@ -43,7 +43,7 @@ def plotProfilesMultipanel(listOfPickles, listOfLabels=None, listOfColors=None, 
         for ax in axarr[0,:]:
             ax.plot(r_bondi, np.zeros(len(r_bondi)))
             secax = ax.secondary_xaxis('top', functions=(rg2kpc, kpc2rg))
-            secax.set_xlabel('R [kpc]',fontsize=fontsize)
+            secax.set_xlabel(r'$R_{\rm M87}$ [kpc]',fontsize=fontsize)
             secax.tick_params(axis='x', labelsize=fontsize-4)
     for col in range(ax1d.shape[0]):
         do_rescale = ('Mdot' in quantities[col] and rescaleValue != 1)
@@ -53,6 +53,8 @@ def plotProfilesMultipanel(listOfPickles, listOfLabels=None, listOfColors=None, 
         plotProfiles(listOfPickles, quantities[col], formatting=False, finish=False, label_list=label_list, color_list=listOfColors, linestyle_list=listOfLinestyles, fig_ax=(fig, ax), \
                 flip_sign=(quantities[col] in ['u^r']), show_init=show_init, show_gizmo=show_gizmo, show_bondi=1, show_rscale=show_rscale, show_mdotinout=show_mdotinout, cycles_to_average=cta, show_divisions=0, show_rb=1, \
                 rescale=do_rescale, rescale_value=rescaleValue, num_time_chunk=1, boxcar_factor=boxcar_factor, average_factor=average_factor) #
+        if quantities[col] == 'eta': ax.axhline(0.01,color='m',lw=3,alpha=0.2) #ax.axhspan(0.01,0.02,color='m',alpha=0.2) # horizontal line to show 2%
+        if quantities[col] == 'beta': ax.legend(loc='best', frameon=False, fontsize=fontsize-4)
         if show_mdotinout and quantities[col] == "Mdot":
             plotProfiles(listOfPickles, 'Mdot_in', formatting=False, finish=False, label_list=[r'$\dot{M}_{\rm in}$'], color_list=['b'], linestyle_list=listOfLinestyles, fig_ax=(fig, ax), \
                     flip_sign=(quantities[col] in ['u^r']), show_init=0, show_gizmo=show_gizmo, show_bondi=1, show_rscale=show_rscale, show_mdotinout=show_mdotinout, cycles_to_average=cta, show_divisions=0, show_rb=1, \
@@ -74,12 +76,15 @@ def plotProfilesMultipanel(listOfPickles, listOfLabels=None, listOfColors=None, 
         ax.set_xlim(xlim)
         if quantities[col] == 'Mdot':
             ax.set_ylim(ylim)
-        #elif quantities[col] == 'eta':
-        #    ax.set_ylim([1e-4,1])
-        #elif quantities[col] == 'beta':
-        #    ax.set_ylim([1e-2,10])
-        elif quantities[col] == 'abs_Omega':
+        elif quantities[col] == 'eta':
+            ax.set_ylim([1e-4,1])
+        elif 'Omega' in quantities[col]:
             ax.set_ylim([1e-3,10])
+        elif quantities[col] == 'phib':
+            ax.set_ylim([10,1e6])
+            ax.legend(loc='best',frameon=False,fontsize=fontsize-4,handlelength=2)
+        if set_beta_ylim and quantities[col] == 'beta':
+            ax.set_ylim([1e-2,10])
     
     for col in range(axarr.shape[1]): axarr[-1,col].set_xlabel('$r \ [r_g]$', fontsize=fontsize)
 
@@ -110,7 +115,7 @@ def plotHydro():
     plotProfilesMultipanel(listOfPickles, listOfLabels=listOfLabels, listOfColors=listOfColors, listOfLinestyles=listOfLinestyles, xlim=xlim, show_pc=True, output='../plots/combined_profiles.pdf')
 
 def plotMHDtest():
-    listOfPickles = ['../data_products/'+dirname for dirname in ['082423_2d_onezone_profiles_all2.pkl','082823_2d_n4_longtout_profiles_all2.pkl','production_runs/072823_beta01_onezone_profiles_all2.pkl', '082423_n4_profiles_all2.pkl']]# 
+    listOfPickles = ['../data_products/'+dirname for dirname in ['082423_2d_onezone_profiles_all2.pkl','082823_2d_n4_longtout_profiles_all2.pkl','production_runs/072823_beta01_onezone_profiles_all2.pkl','082423_n4_profiles_all2.pkl']]# '083123_ozrst_onezone_profiles_all2.pkl', 
     listOfLabels = [r'$\S \,4.1$ weak 1-zone', r'$\S \,4.1$ weak 4-zone',r'$\S \,4.2$ strong 1-zone', r'$\S \,4.2$ strong 4-zone']
     listOfColors = ['tab:red','tab:orange','k', 'tab:blue', 'tab:orange', 'tab:green']
     listOfLinestyles = ['solid','dashed', 'solid', 'solid','dashdot', 'dotted']
@@ -122,14 +127,15 @@ def plotMHDtest():
     boxcar_factor = 0 #4
     plotProfilesMultipanel(listOfPickles, listOfLabels=listOfLabels, listOfColors=listOfColors, listOfLinestyles=listOfLinestyles, \
             xlim=xlim, ylim=ylim, show_init=False, show_gizmo=False, show_rscale=True, quantities=quantities, rescaleValue=rescaleValue, cta=cta, \
-            boxcar_factor=boxcar_factor, average_factor=np.sqrt(2), \
+            boxcar_factor=boxcar_factor, average_factor=2, \
             output='../plots/combined_profiles.pdf')
 def plotMHD():
-    listOfPickles = ['../data_products/'+dirname for dirname in ['081723_rst64_longtin_profiles_all2.pkl']]
+    #listOfPickles = ['../data_products/'+dirname for dirname in ['082423_n8_profiles_all2.pkl']]
+    listOfPickles = ['../data_products/'+dirname for dirname in ['production_runs/072823_beta01_128_profiles_all2.pkl']]
     listOfLabels = ['__nolegend__']
     listOfColors = ['k', 'tab:blue', 'tab:orange', 'tab:green']
     listOfLinestyles = ['solid', 'dashed', 'dashdot', 'dotted']
-    quantities = ['Mdot', 'rho', 'T', 'abs_Omega', 'eta', 'beta'] #, 'abs_Omega'
+    quantities = ['Mdot', 'rho', 'T', 'phib', 'beta', 'eta'] #, 'Omega'
     figsize=(14,8)
     xlim = (2, 2e8)
     ylim = (1e-4,2)
@@ -137,10 +143,10 @@ def plotMHD():
     rescaleValue = bondi.get_quantity_for_rarr([1e5], 'Mdot', rs=np.sqrt(1e5))[0]
     boxcar_factor = 4
     plotProfilesMultipanel(listOfPickles, listOfLabels=listOfLabels, listOfColors=listOfColors, listOfLinestyles=listOfLinestyles, \
-            xlim=xlim, ylim=ylim, show_gizmo=False, show_rscale=True, show_mdotinout=True, figsize=figsize, quantities=quantities, rescaleValue=rescaleValue, cta=cta, boxcar_factor=boxcar_factor,\
-            output='../plots/combined_profiles.pdf')
+            xlim=xlim, ylim=ylim, show_gizmo=False, show_rscale='rho_phib', show_mdotinout=True, figsize=figsize, quantities=quantities, rescaleValue=rescaleValue, cta=cta, boxcar_factor=boxcar_factor,\
+            set_beta_ylim=1,average_factor=2,output='../plots/combined_profiles.pdf')
 
 if __name__ == '__main__':
     #plotHydro()
-    plotMHDtest()
-    #plotMHD()
+    #plotMHDtest()
+    plotMHD()
