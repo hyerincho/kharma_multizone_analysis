@@ -292,6 +292,11 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
       #    tDivList, usableProfiles_num, r_save, num_save = assignTimeBins(D, profiles, ONEZONE, num_time_chunk, zone_time_average_fraction, average_factor)
       #    profiles, _ = readQuantity(D, 'Pb')
       #    _, usableProfiles_den, _, _ = assignTimeBins(D, profiles, ONEZONE, num_time_chunk, zone_time_average_fraction, average_factor)
+      elif quantity == 'phib':
+          profiles, invert = readQuantity(D, 'Phib')
+          tDivList, usableProfiles_num, r_save, num_save = assignTimeBins(D, profiles, ONEZONE, num_time_chunk, zone_time_average_fraction, average_factor)
+          profiles, _ = readQuantity(D, 'Mdot')
+          _, usableProfiles_den, _, _ = assignTimeBins(D, profiles, ONEZONE, num_time_chunk, zone_time_average_fraction, average_factor)
       else:
           profiles, invert = readQuantity(D, quantity)
           tDivList, usableProfiles, r_save, num_save = assignTimeBins(D, profiles, ONEZONE, num_time_chunk, zone_time_average_fraction, average_factor)
@@ -325,6 +330,12 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
             invert = False
           elif "Omega" in quantity:
             plottable = (np.mean(usableProfiles[zone][b], axis=0) * np.power(r_save[zone],3./2)) # normalize by Omega_K
+          elif "phib" in quantity:
+            plottable = np.mean(usableProfiles_num[zone][b], axis=0)
+            plottable_den = np.mean(usableProfiles_den[zone][b], axis=0)
+            if zone == n_zones_eff-1: # r=10
+                i10 = np.argmin(abs(r_save[zone]-10))
+                Mdot_save = plottable_den[i10]
           #elif quantity == "beta":
           #  plottable_num = np.mean(usableProfiles_num[zone][b], axis=0)
           #  plottable_den = np.mean(usableProfiles_den[zone][b], axis=0)
@@ -363,6 +374,8 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
         values_plot = np.squeeze(np.array(values_plot))
         if quantity == "eta":
             values_plot /= Mdot_save # divide by  Mdot at r=10
+        if quantity == "phib":
+            values_plot /= np.sqrt(Mdot_save)
         order = np.argsort(r_plot)
         if label_list is None: label = 't={:.5g} - {:.5g}'.format(tDivList[b],tDivList[b+1])
         else: label = label_list[sim_index]
@@ -454,17 +467,25 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
         analytic_sol = [Mdot/rho[0] * rho_gizmo[0]]*len(r_bondi)
     if analytic_sol is not None: ax.plot(r_bondi,analytic_sol,'b-.',label=label,lw=5, zorder=-100,alpha=0.2)
 
-  elif show_rscale:
+  elif show_rscale!=False:
     # show density scalings
-    if "rho" in quantity: # and "rot" in dirtag:
+    if "rho" in quantity and (show_rscale==True or "rho" in show_rscale): # and "rot" in dirtag:
         rarr= np.logspace(np.log10(2),np.log10(r_sonic),20) #*1000
         factor=1e-8*1e5/r_sonic**2#7e-7
-        ax.plot(rarr,np.power(rarr/1e3,-1)*factor,'g-',alpha=0.3,lw=6,label=r'$r^{-1}$')
+        ax.plot(rarr,np.power(rarr/1e3,-1)*factor,'g-',alpha=0.5,lw=3,label=r'$r^{-1}$')
         #ax.plot(rarr,np.power(rarr/1e3,-1.5)*factor,'g:',alpha=0.3,lw=10,label=r'$r^{-1.5}$')
         #rb=1e5
         #rho0=np.power(3e-6,1.5)
         #ax.plot(rarr,rho0 * (rarr + rb) / rarr,'k-')
         #ax.plot(rarr,np.power(rarr/1e3,-1/2)*factor,'g:',alpha=0.3,lw=10,label=r'$r^{-1/2}$')
+    if quantity == "beta" and (show_rscale==True or "beta" in show_rscale): # and "rot" in dirtag:
+        rarr= np.logspace(np.log10(2),np.log10(100),20) #*1000
+        factor=1e7/r_sonic**2#
+        ax.plot(rarr,np.power(rarr/1e3,3/2.)*factor,'g-',alpha=0.5,lw=3,label=r'$r^{3/2}$')
+    if quantity == "phib" and (show_rscale==True or "phib" in show_rscale): # and "rot" in dirtag:
+        rarr= np.logspace(np.log10(1e2),np.log10(1e5),20) #*1000
+        factor=1/2#
+        ax.plot(rarr,np.power(rarr,1)*factor,'g-',alpha=0.5,lw=3,label=r'$r^{1}$')
   # legends
   if formatting:
     for sim_index in range(len(listOfPickles)):
@@ -538,21 +559,8 @@ if __name__ == '__main__':
   '''
   dictOfAll = {}
   dictOfAll['oz'] = ['061623_ozrst_onezone_profiles_all2.pkl', 'k']
-  dictOfAll['32_old'] = ['bondi_multizone_042723_bflux0_1e-4_32^3_profiles_all2.pkl', 'g']
-  dictOfAll['128_old'] = ['bondi_multizone_050523_bflux0_1e-4_128^3_n3_noshort_profiles_all2.pkl', 'm']
-  dictOfAll['32_tff'] = ['062623_n3_tff_profiles_all2.pkl', 'c']
   #dictOfAll['32_r^1'] = ['062623_n3_1_profiles_all2.pkl', 'y']
-  dictOfAll['b3n7'] = ['071023_b3n7_profiles_all2.pkl', 'grey']
-  dictOfAll['beta1e2'] = ['071023_n3_beta1e2_profiles_all2.pkl', 'darkolivegreen']
   dictOfAll['beta1e0'] = ['071023_n3_beta01_profiles_all2.pkl', 'lightgreen']
-  #listOfPickles = ['../data_products/'+dirname for dirname in \
-  #    ['061623_ozrst_onezone_profiles_all2.pkl', \
-      #'bondi_multizone_042723_bflux0_1e-4_64^3_profiles_all2.pkl', \
-      #'bondi_multizone_050123_bflux0_1e-4_96^3_profiles_all2.pkl', \
-      #'bondi_multizone_050123_bflux0_0_64^3_profiles_all2.pkl', \
-      #'062623_n3_5_4_profiles_all2.pkl', \
-  #    '071023_b3n7_profiles_all2.pkl']]
-      #'bondi_multizone_050823_bflux0_0_64^3_nojit_profiles_all.pkl']]
   listOfPickles = []
   listOfLabels =[]
   colors = []
@@ -571,21 +579,6 @@ if __name__ == '__main__':
   # 2c) n=8
   '''
   dictOfAll = {}
-  #dictOfAll['32_g3, b2r9'] = ['072623_jitall_g3b2r9_profiles_all2.pkl', 'blueviolet']
-  #dictOfAll['32_g3, b2r100'] = ['072623_jitall_profiles_all2.pkl', 'g']
-  #dictOfAll['32_g10,b2r9'] = ['072623_jitall_g10b2r9_profiles_all2.pkl', 'pink']
-  #dictOfAll['32_g10,b2r100'] = ['072623_jitall_g10b2r100_profiles_all2.pkl', 'y']
-  #dictOfAll['32_g50,b2r50'] = ['072623_jitall_g50b2r50_profiles_all2.pkl', 'lightgreen']
-  #dictOfAll['32_combine_out,lin'] = ['072723_test_combine_outer_ann_profiles_all2.pkl', 'g']
-  #dictOfAll['33_moving_rin,weno'] = ['073023_moving_rin_profiles_all2.pkl', 'grey']
-  #dictOfAll['33_moving_rin,weno'] = ['073123_moving_rin_divbfixed_profiles_all2.pkl', 'grey']
-  #dictOfAll['32_weno'] = ['072623_jitall_weno_profiles_all2.pkl', 'crimson']
-  dictOfAll['32_weno_g10'] = ['072723_weno_g10_profiles_all2.pkl', 'g']
-  #dictOfAll['64'] = ['071323_beta01_64_profiles_all2.pkl', 'b']
-  #dictOfAll['64_lin'] = ['072623_bugfixed_jitall_profiles_all2.pkl', 'skyblue']
-  #dictOfAll['64_weno'] = ['072823_64_weno_profiles_all2.pkl', 'b']
-  dictOfAll['64_weno_g10'] = ['073123_64_weno_g10_profiles_all2.pkl', 'b']
-  #dictOfAll['64_weno_g10_df'] = ['080123_64_weno_g10_df_profiles_all2.pkl', 'purple']
   #dictOfAll['64_rst_b64'] = ['080823_rst64_testb64_profiles_all2.pkl','crimson']
   dictOfAll['64_rst_longtin'] = ['081723_rst64_longtin_profiles_all2.pkl', 'c']
   dictOfAll['128'] = ['production_runs/072823_beta01_128_profiles_all2.pkl', 'm']
@@ -609,19 +602,10 @@ if __name__ == '__main__':
   # test
   #listOfPickles = ['../data_products/production_runs/072823_beta01_128_profiles_all2.pkl']
   #listOfPickles = ['../data_products/production_runs/072823_beta01_onezone_profiles_all2.pkl']
-  #listOfPickles = ['../data_products/072723_weno_g10_profiles_all2.pkl']
-  #listOfPickles = ['../data_products/072723_test_combine_outer_ann_profiles_all2.pkl']
-  #listOfPickles = ['../data_products/073123_64_weno_g10_profiles_all2.pkl']
-  #listOfPickles = ['../data_products/073123_moving_rin_divbfixed_profiles_all2.pkl']
-  #listOfPickles = ['../data_products/080123_64_weno_g10_df_profiles_all2.pkl']
-  #listOfPickles = ['../data_products/080623_rst64_profiles_all2.pkl']
-  ##listOfPickles = ['../data_products/080823_rst64_testb64_profiles_all2.pkl']
-  #listOfPickles = ['../data_products/081623_rst128_profiles_all2.pkl']
-  #listOfPickles = ['../data_products/081723_rst64_longtin_-1_profiles_all2.pkl']
-  #listOfPickles = ['../data_products/081723_moving_rin_smallbase_profiles_all2.pkl']
-  #listOfPickles = ['../data_products/081823_gam43_profiles_all2.pkl']
   #listOfPickles = ['../data_products/082223_rst64_longtin4_profiles_all2.pkl']
-  #listOfPickles = ['../data_products/082423_n8_profiles_all2.pkl']
+  listOfPickles = ['../data_products/082423_n4_profiles_all2.pkl']
+  #listOfPickles = ['../data_products/091123_n4_128_profiles_all2.pkl']
+
   listOfLabels = None
   plot_dir = "../plots/test"
   cta=0 # time evolution
@@ -630,7 +614,7 @@ if __name__ == '__main__':
   num_time_chunk=4 #8 #4 #2 #
   boxcar_factor=0 #4 #2 #
   colors=None
-  xlim=[2,2e8]
+  xlim=[2,1e4] #2e8] #
   show_div=False # temp
 
   # colors, linestyles, directory
@@ -643,4 +627,4 @@ if __name__ == '__main__':
     ylim = [None,[1e-4,10]][(quantity in ['Mdot'])] # [1e-3,10] if Mdot, None otherwise
     ylim = [ylim,[1e-4,2]][(quantity in ['abs_Omega'])] #
     plotProfiles(listOfPickles, quantity, output=output, zone_time_average_fraction=avg_frac, cycles_to_average=cta, color_list=colors, linestyle_list=linestyles, label_list=listOfLabels, rescale=False, \
-    trim_zone=True, flip_sign=(quantity in ['u^r']), xlim=xlim, ylim=ylim ,show_gizmo=("gizmo" in plot_dir), show_rscale=show_rscale, num_time_chunk=num_time_chunk, boxcar_factor=boxcar_factor, show_divisions=show_div, show_rb=show_rb, average_factor=np.sqrt(2))
+    trim_zone=True, flip_sign=(quantity in ['u^r']), xlim=xlim, ylim=ylim ,show_gizmo=("gizmo" in plot_dir), show_rscale=show_rscale, num_time_chunk=num_time_chunk, boxcar_factor=boxcar_factor, show_divisions=show_div, show_rb=show_rb, average_factor=2)
