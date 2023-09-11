@@ -17,8 +17,10 @@ ylabel_dictionary['etaMdot'] = r'$\dot{M}-\dot{E}$'
 ylabel_dictionary['beta'] = r'$\langle\beta^{-1}\rangle ^{-1}$'
 ylabel_dictionary['sigma'] = r'$\sigma$'
 ylabel_dictionary['abs_Omega'] = r'$\langle|\Omega|\rangle /\Omega_K$'
+ylabel_dictionary['Omega'] = r'$\langle\Omega\rangle /\Omega_K$'
 ylabel_dictionary['Pg'] = r'$p_{\rm g}$'
 ylabel_dictionary['T'] = r'$\langle\Theta = k\,T/(\mu\, c^2) \rangle$'
+ylabel_dictionary['phib'] = r'$\overline{\Phi_B}/\sqrt{\overline{\dot{M}}_{10}}$'
 
 def variableToLabel(variable):
   try:
