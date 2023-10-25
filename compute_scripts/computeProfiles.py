@@ -58,7 +58,8 @@ def computeProfileSet(dump, quantities=['Mdot', 'rho', 'u', 'T', 'u^r', 'u^phi']
   output = []
   for quantity in quantities:
     print(f"   {quantity}")
-    output.append(shellAverage(dump, quantity, imin=imin, mass_weight=mass_weight))
+    try: output.append(shellAverage(dump, quantity, imin=imin, mass_weight=mass_weight))
+    except: continue
 
   return output
 

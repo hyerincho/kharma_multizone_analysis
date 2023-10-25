@@ -11,6 +11,8 @@ from scipy.ndimage import uniform_filter1d
 import glob
 import h5py
 
+from plotSlices import t_total_to_t_atB, t_atB_to_t_total
+
 def readQuantity(dictionary, quantity):
 
   invert = False
@@ -44,26 +46,46 @@ def readQuantity(dictionary, quantity):
       gam = 5./3. # TODO: I'm currently assuming that the adiabatic index is always this.
       quantity_index = dictionary['quantities'].index('u')
       profiles = [[np.array(list[quantity_index])*(gam-1.) for list in sublist] for sublist in dictionary['profiles']]
+  elif quantity == 'Pb':
+    quantity_index = dictionary['quantities'].index('b')
+    profiles = [[np.array(list[quantity_index])**2/2. for list in sublist] for sublist in dictionary['profiles']]
   else:
     quantity_index = dictionary['quantities'].index(quantity)
     profiles = [[list[quantity_index] for list in sublist] for sublist in dictionary['profiles']]
   return profiles, invert
 
-def assignTimeBins(D, profiles, ONEZONE=False, num_time_chunk=4, zone_time_average_fraction=0.5, factor=2):
+def assignTimeBins(D, profiles, ONEZONE=False, num_time_chunk=4, zone_time_average_fraction=0.5, factor=2, tmax=None):
   # Hyerin (06/20/23) assign to different time bins
+  # tmax: the maximum time to plot in tB units
   n_profiles = len(profiles)
-
-  t_first = np.min(D["times"][0])
-  t_last = np.max(D["times"][-1])
-  tDivList = np.array([t_first+(t_last-t_first)/np.power(factor,i+1) for i in range(num_time_chunk)])
-  tDivList = tDivList[::-1] # in increasing time order
+  radii = D['radii']
   n_zones = D['nzone']
   try: n_zones_eff = D['nzone_eff']
   except : n_zones_eff = n_zones
+  gam=5./3.
+  try:
+    rB = 80.*D["r_sonic"]**2/(27.*gam)
+  except:
+    rB = 1.8e5 #1e5
+  tB = np.power(rB,3./2)
+
+  t_first = np.min(D["times"][0])
+  t_last = np.max(D["times"][-1])
+  if tmax is not None:
+      # number of annuli that has its r_out > rB
+      n_ann_out = 0
+      for i in range(n_zones_eff):
+          if radii[i][-1]>rB: n_ann_out += 1
+      t_last_temp = t_atB_to_t_total(tmax*tB, n_ann_out)
+      if t_last > t_last_temp: 
+          t_last = t_last_temp
+          print('t<{:.3g}'.format(t_last))
+      else: print("The run hasn't reached {}tB. Instead using {:.3g}tB".format(tmax, t_total_to_t_atB(t_last,n_ann_out)/tB))
+  tDivList = np.array([t_first+(t_last-t_first)/np.power(factor,i+1) for i in range(num_time_chunk)])
+  tDivList = tDivList[::-1] # in increasing time order
 
   #if 'moving_rin' in D['runName'] or 'combine_outer' in D['runName']: # temporary Hyerin (07/31/23)
   #  n_zones_eff -= 2
-  radii = D['radii']
   usableProfiles = [[[] for _ in range(num_time_chunk)] for _ in range(n_zones_eff)] # (n_zones, num_time_chunk) dimension
   r_save = [None]*n_zones_eff
   num_save = np.zeros((n_zones_eff,num_time_chunk))
@@ -79,6 +101,8 @@ def assignTimeBins(D, profiles, ONEZONE=False, num_time_chunk=4, zone_time_avera
         if len(times)<1:
             #pdb.set_trace()
             continue # skip this iteration
+        if tmax is not None and times[-1]> t_last:
+            continue
         sorting = np.argwhere(tDivList<times[0]) # put one annulus run in the same time bin, even if one zone run corresponds to multiple bins
         bin_num = sorting[-1,0] if len(sorting)>0 else None
         zone_num = n_zones_eff-1 -int(np.floor(np.log(radii[i][0])/np.log(base))-(base<2))
@@ -116,8 +140,13 @@ def assignTimeBins(D, profiles, ONEZONE=False, num_time_chunk=4, zone_time_avera
   tDivList = np.append(tDivList,t_last)
   return tDivList, usableProfiles, r_save, num_save
 
+def plotIC(ax,profiles):
+    init_r = np.array([])
+    init_plot = np.array([])
+
+
 def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_list=None, linestyle_list=None, figsize=(8,6), flip_sign=False, show_divisions=True, show_rb=False, zone_time_average_fraction=0, 
-  xlabel=None, ylabel=None, xlim=None, ylim=None, label_list=None, fig_ax=None, formatting=True, finish=True, rescale=False, rescale_radius=10, rescale_value=1, cycles_to_average=1, trim_zone=True, show_init=False, show_gizmo=False, show_bondi=False, show_rscale=False, show_mdotinout=False, num_time_chunk=4, boxcar_factor=0, average_factor=2):
+  xlabel=None, ylabel=None, xlim=None, ylim=None, label_list=None, fig_ax=None, formatting=True, finish=True, rescale=False, rescale_radius=10, rescale_value=1, cycles_to_average=1, trim_zone=True, show_init=False, show_gizmo=False, show_bondi=False, show_rscale=False, num_time_chunk=4, boxcar_factor=0, average_factor=2, eta_norm_Bondi=False, lw=2, tmax_list=None):
 
   if isinstance(listOfPickles, str):
     listOfPickles = [listOfPickles]
@@ -134,6 +163,11 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
     fig, ax = plt.subplots(1, 1, figsize=figsize)
   else:
     fig, ax = fig_ax
+  
+  rescalingFactor = 1.0
+  if rescale:
+    #Find rescaling factor.
+    rescalingFactor = 1./rescale_value
 
   #Profiles are pre-computed.
   #See ../compute_scripts/computeProfiles.py for how this file is formatted.
@@ -173,16 +207,7 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
 
       r_plot = np.array([])
       values_plot = np.array([])
-      init_r = np.array([])
-      init_plot = np.array([])
       #Only plot the very last iteration.  Recommended for comparing different initial conditions.
-      rescalingFactor = 1.0
-      if rescale:
-        #Find rescaling factor.
-        #for r_set, profile_set in zip(radii,profiles):
-        #  if (rescale_radius >= r_set[0]) & (rescale_radius <= r_set[-1]):
-        #    rescalingFactor = rescale_value / np.interp(np.log10(rescale_radius), np.log10(r_set), profile_set)
-        rescalingFactor = 1./rescale_value
       last_time = 0
       for zone in range(n_zones_eff):
         matchingIndices = np.where(zone_number_sequence == zone)[0]
@@ -263,43 +288,44 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
 
     else:
       # HYERIN: split into time chunks
+      print(listOfPickles[sim_index])
       if 'onezone' in listOfPickles[sim_index]: ONEZONE = True
       else: ONEZONE = False
       
-      #average_factor = 2 #np.sqrt(2) #2 #  1.1 # 
-      rescalingFactor = 1.0
-      if rescale:
-        #Find rescaling factor.
-        rescalingFactor = 1./rescale_value
+      if type(tmax_list) == list: tmax = tmax_list[sim_index]
+      else: tmax = tmax_list
       if quantity == 'eta':
           profiles, invert = readQuantity(D, 'Edot')
-          tDivList, usableProfiles_num, r_save, num_save = assignTimeBins(D, profiles, ONEZONE, num_time_chunk, zone_time_average_fraction, average_factor)
+          tDivList, usableProfiles_num, r_save, num_save = assignTimeBins(D, profiles, ONEZONE, num_time_chunk, zone_time_average_fraction, average_factor, tmax)
           profiles, _ = readQuantity(D, 'Mdot')
-          _, usableProfiles_den, _, _ = assignTimeBins(D, profiles, ONEZONE, num_time_chunk, zone_time_average_fraction, average_factor)
+          _, usableProfiles_den, _, _ = assignTimeBins(D, profiles, ONEZONE, num_time_chunk, zone_time_average_fraction, average_factor, tmax)
           #usableProfiles = 1.-usableProfiles_num/usableProfiles_den
       elif quantity == 'etaMdot':
           profiles, invert = readQuantity(D, 'Edot')
-          tDivList, usableProfiles_num, r_save, num_save = assignTimeBins(D, profiles, ONEZONE, num_time_chunk, zone_time_average_fraction, average_factor)
+          tDivList, usableProfiles_num, r_save, num_save = assignTimeBins(D, profiles, ONEZONE, num_time_chunk, zone_time_average_fraction, average_factor, tmax)
           profiles, _ = readQuantity(D, 'Mdot')
-          _, usableProfiles_den, _, _ = assignTimeBins(D, profiles, ONEZONE, num_time_chunk, zone_time_average_fraction, average_factor)
+          _, usableProfiles_den, _, _ = assignTimeBins(D, profiles, ONEZONE, num_time_chunk, zone_time_average_fraction, average_factor, tmax)
       elif quantity == 'u^r':
           profiles, invert = readQuantity(D, 'Mdot')
-          tDivList, usableProfiles_num, r_save, num_save = assignTimeBins(D, profiles, ONEZONE, num_time_chunk, zone_time_average_fraction, average_factor)
+          tDivList, usableProfiles_num, r_save, num_save = assignTimeBins(D, profiles, ONEZONE, num_time_chunk, zone_time_average_fraction, average_factor, tmax)
           profiles, _ = readQuantity(D, 'rho')
-          _, usableProfiles_den, _, _ = assignTimeBins(D, profiles, ONEZONE, num_time_chunk, zone_time_average_fraction, average_factor)
+          _, usableProfiles_den, _, _ = assignTimeBins(D, profiles, ONEZONE, num_time_chunk, zone_time_average_fraction, average_factor, tmax)
       #elif quantity == 'beta':
       #    profiles, invert = readQuantity(D, 'Pg')
-      #    tDivList, usableProfiles_num, r_save, num_save = assignTimeBins(D, profiles, ONEZONE, num_time_chunk, zone_time_average_fraction, average_factor)
-      #    profiles, _ = readQuantity(D, 'Pb')
-      #    _, usableProfiles_den, _, _ = assignTimeBins(D, profiles, ONEZONE, num_time_chunk, zone_time_average_fraction, average_factor)
+      #    tDivList, usableProfiles_num, r_save, num_save = assignTimeBins(D, profiles, ONEZONE, num_time_chunk, zone_time_average_fraction, average_factor, tmax)
+      #    try: profiles, _ = readQuantity(D, 'Pb')
+      #    except: continue
+      #    _, usableProfiles_den, _, _ = assignTimeBins(D, profiles, ONEZONE, num_time_chunk, zone_time_average_fraction, average_factor, tmax)
       elif quantity == 'phib':
-          profiles, invert = readQuantity(D, 'Phib')
-          tDivList, usableProfiles_num, r_save, num_save = assignTimeBins(D, profiles, ONEZONE, num_time_chunk, zone_time_average_fraction, average_factor)
+          try: profiles, invert = readQuantity(D, 'Phib')
+          except:  continue
+          tDivList, usableProfiles_num, r_save, num_save = assignTimeBins(D, profiles, ONEZONE, num_time_chunk, zone_time_average_fraction, average_factor,tmax)
           profiles, _ = readQuantity(D, 'Mdot')
-          _, usableProfiles_den, _, _ = assignTimeBins(D, profiles, ONEZONE, num_time_chunk, zone_time_average_fraction, average_factor)
+          _, usableProfiles_den, _, _ = assignTimeBins(D, profiles, ONEZONE, num_time_chunk, zone_time_average_fraction, average_factor,tmax)
       else:
-          profiles, invert = readQuantity(D, quantity)
-          tDivList, usableProfiles, r_save, num_save = assignTimeBins(D, profiles, ONEZONE, num_time_chunk, zone_time_average_fraction, average_factor)
+          try: profiles, invert = readQuantity(D, quantity)
+          except: continue
+          tDivList, usableProfiles, r_save, num_save = assignTimeBins(D, profiles, ONEZONE, num_time_chunk, zone_time_average_fraction, average_factor, tmax)
       
       if color_list is None: colors=plt.cm.gnuplot(np.linspace(0.9,0.3,num_time_chunk))
       else: colors= [color_list[sim_index]]
@@ -314,7 +340,8 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
             plottable_den = np.mean(usableProfiles_den[zone][b], axis=0)
             if zone == n_zones_eff-1: # r=10
                 i10 = np.argmin(abs(r_save[zone]-10))
-                Mdot_save = plottable_den[i10]
+                if eta_norm_Bondi: Mdot_save = rescale_value # TODO: change to directly calculating Mdot_B
+                else: Mdot_save = plottable_den[i10]
             plottable = plottable_den- plottable_num #+ 4.5e-3
             #plottable = np.mean(usableProfiles[zone][b],axis=0)
             invert = False
@@ -383,8 +410,8 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
             boxcar_avged = values_plot[order]
         else:
             boxcar_avged = uniform_filter1d(values_plot[order], size=n_radii//boxcar_factor) # (07/12/23) boxcar averaging
-        ax.plot(r_plot[order], boxcar_avged, color=colors[b], ls=linestyle_list[sim_index], lw=2, label=label) 
-        if (num_time_chunk == 1): ax.plot(r_plot[order], -boxcar_avged, color=colors[b], ls=':', lw=2) 
+        ax.plot(r_plot[order], boxcar_avged, color=colors[b], ls=linestyle_list[sim_index], lw=lw, label=label)
+        if quantity=='eta' or(num_time_chunk == 1): ax.plot(r_plot[order], -boxcar_avged, color=colors[b], ls=':', lw=lw+1)
 
   #Formatting
   if formatting:
@@ -393,6 +420,10 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
       ax.set_xlabel(xlabel)
     if ylabel is None:
       ylabel = variableToLabel(quantity)
+      if rescale:
+        ylabel = ylabel.replace('arb. units', r'$\dot{M}_B$')
+      if eta_norm_Bondi and quantity=='eta':
+        ylabel = r'$\overline{\dot{M}-\dot{E}}/\dot{M}_B$'
       ax.set_ylabel(ylabel)  
       ax.set_xscale('log')
       ax.set_yscale('log')
@@ -412,19 +443,27 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
     r_sonic = D["r_sonic"]
   except:
     r_sonic = np.sqrt(1e5)
+  gam=5./3.
 
   if show_rb:
-    ax.axvline(r_sonic**2, color='grey', lw=1, alpha=0.2)
+    ax.axvline(1./gam*80./27.*r_sonic**2, color='grey', lw=1, alpha=1, ls='--')
   if show_bondi:
     # Bondi analytic overplotting
     xlim = ax.get_xlim()
     r_bondi = np.logspace(np.log10(max(2,xlim[0])), np.log10(xlim[1]), 50)
     analytic_sol = bondi.get_quantity_for_rarr(r_bondi, quantity, rs=r_sonic)
-    if analytic_sol is not None and not rescale:
+    if quantity == "eta": 
+        analytic_sol = np.ones(len(r_bondi))*(-1.)*27.*gam/(80.*(gam-1)*r_sonic**2) # look at my rel. Bondi note where gam=5/3
+        print(analytic_sol[0])
+
+    if analytic_sol is not None:# and not rescale:
       if quantity == "rho": label = "Bondi analytic"
       else: label = "__nolegend__"
-      ax.plot(r_bondi, analytic_sol, color='slategrey',label=label, lw=6, ls='-', zorder=-100,alpha=0.5)
-    rb = 1e5
+      if rescale:
+          analytic_sol *= rescalingFactor
+      ax.plot(r_bondi, analytic_sol, color='slategrey',label=label, lw=10, ls='-', zorder=-100,alpha=0.5)
+      ax.plot(r_bondi, -analytic_sol, color='slategrey', lw=10, ls=':', zorder=-100,alpha=0.5)
+    #rb = 1e5
     #rho0 = bondi.get_quantity_for_rarr([1e8], quantity, rs=r_sonic)
     #if 'rho' in quantity:
     #    ax.plot(r_bondi,rho0 * (r_bondi + rb) / r_bondi,'k:')
@@ -471,21 +510,30 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
     # show density scalings
     if "rho" in quantity and (show_rscale==True or "rho" in show_rscale): # and "rot" in dirtag:
         rarr= np.logspace(np.log10(2),np.log10(r_sonic),20) #*1000
-        factor=1e-8*1e5/r_sonic**2#7e-7
-        ax.plot(rarr,np.power(rarr/1e3,-1)*factor,'g-',alpha=0.5,lw=3,label=r'$r^{-1}$')
+        factor=7e-8*1e5/r_sonic**2#7e-7
+        ax.plot(rarr,np.power(rarr/1e3,-1)*factor,'g-',alpha=0.5,lw=2)#,label=r'$r^{-1}$')
+        ax.text(rarr[len(rarr)//2], np.power(rarr[len(rarr)//2]/1e3,-1)*factor/20, r'$r^{-1}$')
+        ax.plot(rarr,np.power(rarr/1e3,-3./2.)*factor*500,'b-',alpha=0.5,lw=2)#,label=r'$r^{-3/2}$')
+        ax.text(rarr[len(rarr)//2], np.power(rarr[len(rarr)//2]/1e3,-3./2.)*factor*1000, r'$r^{-3/2}$')
         #ax.plot(rarr,np.power(rarr/1e3,-1.5)*factor,'g:',alpha=0.3,lw=10,label=r'$r^{-1.5}$')
         #rb=1e5
         #rho0=np.power(3e-6,1.5)
         #ax.plot(rarr,rho0 * (rarr + rb) / rarr,'k-')
         #ax.plot(rarr,np.power(rarr/1e3,-1/2)*factor,'g:',alpha=0.3,lw=10,label=r'$r^{-1/2}$')
-    if quantity == "beta" and (show_rscale==True or "beta" in show_rscale): # and "rot" in dirtag:
+    if "T" in quantity and (show_rscale==True or "T" in show_rscale):
+        rarr= np.logspace(np.log10(2),np.log10(r_sonic),20) 
+        factor=5e-2
+        ax.plot(rarr,np.power(rarr,-1)*factor,'b-',alpha=0.5,lw=2)#,label=r'$r^{-1}$')
+        ax.text(rarr[len(rarr)//2], np.power(rarr[len(rarr)//2],-1)*factor/10, r'$r^{-1}$')
+    if quantity == "beta" and (show_rscale==True or "beta" in show_rscale):
         rarr= np.logspace(np.log10(2),np.log10(100),20) #*1000
         factor=1e7/r_sonic**2#
-        ax.plot(rarr,np.power(rarr/1e3,3/2.)*factor,'g-',alpha=0.5,lw=3,label=r'$r^{3/2}$')
-    if quantity == "phib" and (show_rscale==True or "phib" in show_rscale): # and "rot" in dirtag:
+        ax.plot(rarr,np.power(rarr/1e3,3/2.)*factor,'g-',alpha=0.5,lw=2,label=r'$r^{3/2}$')
+    if quantity == "phib" and (show_rscale==True or "phib" in show_rscale):
         rarr= np.logspace(np.log10(1e2),np.log10(1e5),20) #*1000
         factor=1/2#
-        ax.plot(rarr,np.power(rarr,1)*factor,'g-',alpha=0.5,lw=3,label=r'$r^{1}$')
+        ax.plot(rarr,np.power(rarr,1)*factor,'g-',alpha=0.5,lw=2)#,label=r'$r^{1}$')
+        ax.text(rarr[len(rarr)//2], np.power(rarr[len(rarr)//2],1)*factor/3, r'$r^{1}$')
   # legends
   if formatting:
     for sim_index in range(len(listOfPickles)):
@@ -558,9 +606,12 @@ if __name__ == '__main__':
   # 2b) strong field test
   '''
   dictOfAll = {}
-  dictOfAll['oz'] = ['061623_ozrst_onezone_profiles_all2.pkl', 'k']
+  dictOfAll['oz'] = ['production_runs/072823_beta01_onezone_profiles_all2.pkl', 'k']
+  #dictOfAll['oz'] = ['100223_onezone_n4_profiles_all2.pkl', 'k']
   #dictOfAll['32_r^1'] = ['062623_n3_1_profiles_all2.pkl', 'y']
-  dictOfAll['beta1e0'] = ['071023_n3_beta01_profiles_all2.pkl', 'lightgreen']
+  #dictOfAll['beta1e0'] = ['071023_n3_beta01_profiles_all2.pkl', 'lightgreen']
+  dictOfAll['cap'] = ['101623_n4_cap_profiles_all2.pkl','b']
+  dictOfAll['loc'] = ['101623_n4_locff_profiles_all2.pkl','r']
   listOfPickles = []
   listOfLabels =[]
   colors = []
@@ -568,20 +619,24 @@ if __name__ == '__main__':
       listOfPickles += ['../data_products/'+value[0]]
       listOfLabels += [key]
       colors += [value[1]]
-  plot_dir = '../plots/062023_strongfield'
+  plot_dir = '../plots/101823_strongfield'
   avg_frac=0.1 #0 #
   cta=0 #2 #
   show_rscale=False
   num_time_chunk=1
-  xlim=[2,4.5e3]
+  xlim=[2,3e4] #4.5e3]
   '''
 
   # 2c) n=8
   '''
   dictOfAll = {}
   #dictOfAll['64_rst_b64'] = ['080823_rst64_testb64_profiles_all2.pkl','crimson']
-  dictOfAll['64_rst_longtin'] = ['081723_rst64_longtin_profiles_all2.pkl', 'c']
-  dictOfAll['128'] = ['production_runs/072823_beta01_128_profiles_all2.pkl', 'm']
+  dictOfAll['r^-3/2'] = ['062223_diffinit_bondi_profiles_all2.pkl','b']
+  dictOfAll['r^-1'] = ['062023_0.02tff_ur0_profiles_all2.pkl','k']
+  dictOfAll['const'] = ['062623_constinit_profiles_all2.pkl','r']
+  #dictOfAll['64_rst_longtin'] = ['081723_rst64_longtin_profiles_all2.pkl', 'c']
+  #dictOfAll['r^-1'] = ['082423_n8_profiles_all2.pkl','k']
+  #dictOfAll['128'] = ['production_runs/072823_beta01_128_profiles_all2.pkl', 'm']
   #dictOfAll['32_hd'] = ['062623_hd_ur0_profiles_all2.pkl','c']
   listOfPickles = []
   listOfLabels =[]
@@ -590,7 +645,7 @@ if __name__ == '__main__':
       listOfPickles += ['../data_products/'+value[0]]
       listOfLabels += [key]
       colors += [value[1]]
-  plot_dir = '../plots/082123_n8'
+  plot_dir = '../plots/102423_initialization_test'
   avg_frac=0.5
   cta=0 # 40
   num_time_chunk = 1
@@ -600,11 +655,18 @@ if __name__ == '__main__':
   '''
 
   # test
+  #listOfPickles = ['../data_products/bondi_multizone_022723_jit0.3_new_coord_profiles_all2.pkl']
+  #listOfPickles = ['../data_products/bondi_multizone_030723_bondi_128^3_profiles_all2.pkl']
   #listOfPickles = ['../data_products/production_runs/072823_beta01_128_profiles_all2.pkl']
   #listOfPickles = ['../data_products/production_runs/072823_beta01_onezone_profiles_all2.pkl']
+  #listOfPickles = ['../data_products/062023_0.02tff_ur0_profiles_all2.pkl']
   #listOfPickles = ['../data_products/082223_rst64_longtin4_profiles_all2.pkl']
-  listOfPickles = ['../data_products/082423_n4_profiles_all2.pkl']
+  #listOfPickles = ['../data_products/082423_n4_profiles_all2.pkl']
   #listOfPickles = ['../data_products/091123_n4_128_profiles_all2.pkl']
+  listOfPickles = ['../data_products/082423_n8_profiles_all2.pkl']
+  #listOfPickles = ['../data_products/100223_onezone_n4_profiles_all2.pkl']
+  #listOfPickles = ['../data_products/101123_gizmo_mhd_3d_profiles_all2.pkl']
+  #listOfPickles = ['../data_products/101623_n4_cap_profiles_all2.pkl']
 
   listOfLabels = None
   plot_dir = "../plots/test"
@@ -614,17 +676,17 @@ if __name__ == '__main__':
   num_time_chunk=4 #8 #4 #2 #
   boxcar_factor=0 #4 #2 #
   colors=None
-  xlim=[2,1e4] #2e8] #
+  xlim=[2,1e4] # 2e8] #
   show_div=False # temp
 
   # colors, linestyles, directory
-  linestyles=['-','-',':',':',':', '--', ':']
+  linestyles=['-','-','-',':',':', '--', ':']
   os.makedirs(plot_dir, exist_ok=True)
 
-  for quantity in ['eta', 'etaMdot', 'beta', 'Edot', 'Mdot', 'rho', 'u', 'T', 'abs_u^r', 'abs_u^phi', 'abs_u^th', 'u^r', 'u^phi',  'u^th']: #'abs_Omega', 'K', 'Pg', 
+  for quantity in ['K', 'eta', 'etaMdot', 'beta', 'Edot', 'Mdot', 'rho', 'u', 'T', 'abs_u^r', 'abs_u^phi', 'abs_u^th', 'u^r', 'u^phi',  'u^th']: #'abs_Omega', 'Pg', 
     output = plot_dir+"/profile_"+quantity+".pdf"
     #output = None
     ylim = [None,[1e-4,10]][(quantity in ['Mdot'])] # [1e-3,10] if Mdot, None otherwise
     ylim = [ylim,[1e-4,2]][(quantity in ['abs_Omega'])] #
     plotProfiles(listOfPickles, quantity, output=output, zone_time_average_fraction=avg_frac, cycles_to_average=cta, color_list=colors, linestyle_list=linestyles, label_list=listOfLabels, rescale=False, \
-    trim_zone=True, flip_sign=(quantity in ['u^r']), xlim=xlim, ylim=ylim ,show_gizmo=("gizmo" in plot_dir), show_rscale=show_rscale, num_time_chunk=num_time_chunk, boxcar_factor=boxcar_factor, show_divisions=show_div, show_rb=show_rb, average_factor=2)
+    trim_zone=True, flip_sign=(quantity in ['u^r']), xlim=xlim, ylim=ylim ,show_gizmo=("gizmo" in plot_dir), show_rscale=show_rscale, num_time_chunk=num_time_chunk, boxcar_factor=boxcar_factor, show_divisions=show_div, show_rb=show_rb, average_factor=2)# , tmax=2130)# 2130 is when 20tB has passed for the HD run
