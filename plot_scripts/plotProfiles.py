@@ -104,12 +104,13 @@ def assignTimeBins(D, profiles, ONEZONE=False, num_time_chunk=4, zone_time_avera
         if tmax is not None and times[-1]> t_last:
             continue
         sorting = np.argwhere(tDivList<times[0]) # put one annulus run in the same time bin, even if one zone run corresponds to multiple bins
-        bin_num = sorting[-1,0] if len(sorting)>0 else None
+        #sorting = np.argwhere([np.any(tDiv<times) for tDiv in tDivList]) # put one annulus run in the same time bin, if any of the time in one annulus is in the range of the bin
+        bin_num = sorting[-1,0] if len(sorting)>0 else None # take the largest number as the bin
         zone_num = n_zones_eff-1 -int(np.floor(np.log(radii[i][0])/np.log(base))-(base<2))
        
         # taken from above
         if len(times) > 1 and bin_num is not None or ONEZONE: # If there's only 1 output, skip this run
-          delt = np.ones(len(times)) #np.gradient(times)
+          delt = np.gradient(times) #np.ones(len(times)) #
           if ONEZONE:
             for bin_num in range(num_time_chunk):
               if bin_num == num_time_chunk-1:
@@ -137,12 +138,43 @@ def assignTimeBins(D, profiles, ONEZONE=False, num_time_chunk=4, zone_time_avera
           if r_save[zone_num] is None:
             r_save[zone_num] = radii[i]
 
+  for zone in range(n_zones_eff):
+      # catch any cases where there are no data
+      zone_number_sequence = np.array(D["zones"])
+      matchingIndices = np.where(zone_number_sequence == zone)[0]
+      if len(usableProfiles[zone][0]) == 0 and not ONEZONE:
+          fill_i = np.argmin([abs(tDivList[0]-D["times"][i][0]) for i in matchingIndices])
+          fill_idx = matchingIndices[fill_i]
+          print("Found an empty bin, filling with the closest starting at t = {:.3g} and the # of the annulus is {}".format(D["times"][fill_idx][0], fill_idx)) #D["times"][fill_idx][0], D["times"][fill_idx+1][0], D["times"][fill_idx-1][0], tDivList[0])
+          
+          times = D["times"][fill_idx]
+          delt = np.gradient(times)
+          averaging_mask = times >= times[-1] - (times[-1]-times[0])*zone_time_average_fraction
+          integrand = np.transpose(np.squeeze(np.array(profiles[fill_idx]))[averaging_mask])
+          usableProfiles[zone][0].append(np.sum(integrand*delt[averaging_mask], axis=1) / np.sum(delt[averaging_mask]))
+          r_save[zone] = radii[fill_idx]
+          num_save[zone][0] += 1
+
   tDivList = np.append(tDivList,t_last)
   return tDivList, usableProfiles, r_save, num_save
 
-def plotIC(ax,profiles):
+def plotIC(ax,profiles, n_zones_eff, zone_number_sequence, radii, invert, color):
     init_r = np.array([])
     init_plot = np.array([])
+
+    n_radii = len(radii[0])
+    for zone in range(n_zones_eff):
+        matchingIndices = np.where(zone_number_sequence == zone)[0]
+        mask = np.full(len(radii[matchingIndices[0]]), True, dtype=bool)
+        if zone > 0:
+          mask[-int(n_radii/2):] = False
+        init_r = np.concatenate([init_r,radii[matchingIndices[0]][mask]])
+        init_plot = np.concatenate([init_plot,profiles[matchingIndices[0]][0][mask]])
+
+    order = np.argsort(init_r)
+    if invert: ax.plot(np.array(init_r[order]), 1./init_plot[order], color=color, ls=':', lw=1, alpha=1)
+    else: ax.plot(np.array(init_r[order]), init_plot[order], color=color, ls=':', lw=1, alpha=1)
+    return ax
 
 
 def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_list=None, linestyle_list=None, figsize=(8,6), flip_sign=False, show_divisions=True, show_rb=False, zone_time_average_fraction=0, 
@@ -223,13 +255,6 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
         selectedProfiles = [profiles[i] for i in indicesToAverage]
         selectedProfileTimes = [D['times'][i] for i in indicesToAverage]
         usableProfiles = []
-        if show_init and (quantity == "rho" or quantity == "T" or quantity == "beta"):
-            # show initial conditions
-            mask = np.full(len(radii[matchingIndices[0]]), True, dtype=bool)
-            if zone > 0:
-              mask[-int(n_radii/2):] = False
-            init_r = np.concatenate([init_r,radii[matchingIndices[0]][mask]])
-            init_plot = np.concatenate([init_plot,profiles[matchingIndices[0]][0][mask]])
             
 
         for run_index in range(len(selectedProfiles)):
@@ -282,9 +307,9 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
       else: label = label_list[sim_index]
       ax.plot(r_plot[order], values_plot[order], color=color_list[sim_index], ls=linestyle_list[sim_index], lw=2,label=label)
       if show_init and (quantity == "rho" or quantity == "T" or quantity=="beta" or quantity=='u^r'):
-        order = np.argsort(init_r)
-        if invert: ax.plot(np.array(init_r[order]), 1./init_plot[order], color=color_list[sim_index], ls=':', lw=1, alpha=1)
-        else: ax.plot(np.array(init_r[order]), init_plot[order], color=color_list[sim_index], ls=':', lw=1, alpha=1)
+        # show initial conditions
+        ax = plotIC(ax,profiles, n_zones_eff, zone_number_sequence, radii, invert, 'k')
+
 
     else:
       # HYERIN: split into time chunks
@@ -404,7 +429,7 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
         if quantity == "phib":
             values_plot /= np.sqrt(Mdot_save)
         order = np.argsort(r_plot)
-        if label_list is None: label = 't={:.5g} - {:.5g}'.format(tDivList[b],tDivList[b+1])
+        if label_list is None: label = 't={:.5g} - {:.5g}'.format(tDivList[b],tDivList[b+1]) #r'$2^{{{}}} - 2^{{{}}}$'.format(-num_time_chunk+b,-num_time_chunk+b+1)#+r' [$t_{\rm run}$]' #
         else: label = label_list[sim_index]
         if boxcar_factor == 0:
             boxcar_avged = values_plot[order]
@@ -412,6 +437,11 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
             boxcar_avged = uniform_filter1d(values_plot[order], size=n_radii//boxcar_factor) # (07/12/23) boxcar averaging
         ax.plot(r_plot[order], boxcar_avged, color=colors[b], ls=linestyle_list[sim_index], lw=lw, label=label)
         if quantity=='eta' or(num_time_chunk == 1): ax.plot(r_plot[order], -boxcar_avged, color=colors[b], ls=':', lw=lw+1)
+        
+        if show_init and (quantity == "rho" or quantity == "T" or quantity=="beta" or quantity=='u^r'):
+            # show initial conditions
+            #pdb.set_trace()
+            ax = plotIC(ax,profiles, n_zones_eff, zone_number_sequence, radii, invert, 'k')
 
   #Formatting
   if formatting:
@@ -514,7 +544,7 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
         ax.plot(rarr,np.power(rarr/1e3,-1)*factor,'g-',alpha=0.5,lw=2)#,label=r'$r^{-1}$')
         ax.text(rarr[len(rarr)//2], np.power(rarr[len(rarr)//2]/1e3,-1)*factor/20, r'$r^{-1}$')
         ax.plot(rarr,np.power(rarr/1e3,-3./2.)*factor*500,'b-',alpha=0.5,lw=2)#,label=r'$r^{-3/2}$')
-        ax.text(rarr[len(rarr)//2], np.power(rarr[len(rarr)//2]/1e3,-3./2.)*factor*1000, r'$r^{-3/2}$')
+        ax.text(rarr[len(rarr)//2], np.power(rarr[len(rarr)//2]/1e3,-3./2.)*factor*1000, r'$r^{-3/2}$', clip_on=True)
         #ax.plot(rarr,np.power(rarr/1e3,-1.5)*factor,'g:',alpha=0.3,lw=10,label=r'$r^{-1.5}$')
         #rb=1e5
         #rho0=np.power(3e-6,1.5)
@@ -566,6 +596,7 @@ if __name__ == '__main__':
   show_div=True
   show_rb=False
   boxcar_factor=0
+  tmax_list=None
   
   # 1a) Bondi
   '''
@@ -604,14 +635,17 @@ if __name__ == '__main__':
   '''
 
   # 2b) strong field test
-  '''
   dictOfAll = {}
   dictOfAll['oz'] = ['production_runs/072823_beta01_onezone_profiles_all2.pkl', 'k']
-  #dictOfAll['oz'] = ['100223_onezone_n4_profiles_all2.pkl', 'k']
+  dictOfAll['oz_new'] = ['100223_onezone_n4_profiles_all2.pkl', 'y']
   #dictOfAll['32_r^1'] = ['062623_n3_1_profiles_all2.pkl', 'y']
   #dictOfAll['beta1e0'] = ['071023_n3_beta01_profiles_all2.pkl', 'lightgreen']
   dictOfAll['cap'] = ['101623_n4_cap_profiles_all2.pkl','b']
   dictOfAll['loc'] = ['101623_n4_locff_profiles_all2.pkl','r']
+  dictOfAll['old']=['082423_n4_profiles_all2.pkl','m']
+  #dictOfAll['reproduce']=['102423_n4_incorrectrb_profiles_all2.pkl','g']
+  dictOfAll['reproduce']=['110623_n4_reproduce_082423_profiles_all2.pkl','g']
+  dictOfAll['WKS'] = ['111423_n4_wks_profiles_all2.pkl','c']
   listOfPickles = []
   listOfLabels =[]
   colors = []
@@ -625,19 +659,23 @@ if __name__ == '__main__':
   show_rscale=False
   num_time_chunk=1
   xlim=[2,3e4] #4.5e3]
-  '''
+  tmax_list=[None,None,30,30,30,30, 30] #None, None, 90, None] #
 
   # 2c) n=8
   '''
   dictOfAll = {}
   #dictOfAll['64_rst_b64'] = ['080823_rst64_testb64_profiles_all2.pkl','crimson']
-  dictOfAll['r^-3/2'] = ['062223_diffinit_bondi_profiles_all2.pkl','b']
-  dictOfAll['r^-1'] = ['062023_0.02tff_ur0_profiles_all2.pkl','k']
-  dictOfAll['const'] = ['062623_constinit_profiles_all2.pkl','r']
+  #dictOfAll['r^-3/2'] = ['062223_diffinit_bondi_profiles_all2.pkl','b']
+  #dictOfAll['r^-1'] = ['062023_0.02tff_ur0_profiles_all2.pkl','k']
+  #dictOfAll['const'] = ['062623_constinit_profiles_all2.pkl','r']
+  #dictOfAll['gizmo_1d'] = ['101123_gizmo_mhd_profiles_all2.pkl','k']
+  #dictOfAll['gizmo_3d'] = ['101123_gizmo_mhd_3d_profiles_all2.pkl','b']
   #dictOfAll['64_rst_longtin'] = ['081723_rst64_longtin_profiles_all2.pkl', 'c']
-  #dictOfAll['r^-1'] = ['082423_n8_profiles_all2.pkl','k']
+  dictOfAll['r^-1'] = ['082423_n8_profiles_all2.pkl','k']
   #dictOfAll['128'] = ['production_runs/072823_beta01_128_profiles_all2.pkl', 'm']
   #dictOfAll['32_hd'] = ['062623_hd_ur0_profiles_all2.pkl','c']
+  dictOfAll['cap'] = ['102323_n8_cap_profiles_all2.pkl', 'b'] 
+  dictOfAll['locff'] = ['102323_n8_locff_profiles_all2.pkl', 'r'] 
   listOfPickles = []
   listOfLabels =[]
   colors = []
@@ -645,48 +683,62 @@ if __name__ == '__main__':
       listOfPickles += ['../data_products/'+value[0]]
       listOfLabels += [key]
       colors += [value[1]]
-  plot_dir = '../plots/102423_initialization_test'
+  plot_dir = '../plots/110123_testtrun' #'../plots/103023_gizmo_1d_v_3d'
   avg_frac=0.5
   cta=0 # 40
   num_time_chunk = 1
   xlim=[2,2e8]
   show_rscale=False #True
   boxcar_factor=4 #2
+  tmax_list=[10,10,None]
   '''
 
   # test
+  '''
   #listOfPickles = ['../data_products/bondi_multizone_022723_jit0.3_new_coord_profiles_all2.pkl']
   #listOfPickles = ['../data_products/bondi_multizone_030723_bondi_128^3_profiles_all2.pkl']
   #listOfPickles = ['../data_products/production_runs/072823_beta01_128_profiles_all2.pkl']
   #listOfPickles = ['../data_products/production_runs/072823_beta01_onezone_profiles_all2.pkl']
-  #listOfPickles = ['../data_products/062023_0.02tff_ur0_profiles_all2.pkl']
-  #listOfPickles = ['../data_products/082223_rst64_longtin4_profiles_all2.pkl']
   #listOfPickles = ['../data_products/082423_n4_profiles_all2.pkl']
-  #listOfPickles = ['../data_products/091123_n4_128_profiles_all2.pkl']
-  listOfPickles = ['../data_products/082423_n8_profiles_all2.pkl']
+  #listOfPickles = ['../data_products/082423_n8_profiles_all2.pkl']
   #listOfPickles = ['../data_products/100223_onezone_n4_profiles_all2.pkl']
-  #listOfPickles = ['../data_products/101123_gizmo_mhd_3d_profiles_all2.pkl']
+  #listOfPickles = ['../data_products/101123_gizmo_mhd_3d_profiles_all2.pkl'] # 3d
   #listOfPickles = ['../data_products/101623_n4_cap_profiles_all2.pkl']
+  #listOfPickles = ['../data_products/101623_n4_locff_profiles_all2.pkl']
+  #listOfPickles = ['../data_products/102323_mhd_wks_profiles_all2.pkl']
+  #listOfPickles = ['../data_products/102323_n8_locff_profiles_all2.pkl']
+  #listOfPickles = ['../data_products/102423_n8_bondi_profiles_all2.pkl']
+  #listOfPickles = ['../data_products/102423_n4_incorrectrb_profiles_all2.pkl']
+  #listOfPickles = ['../data_products/103023_hd_jitter_profiles_all2.pkl']
+  #listOfPickles = ['../data_products/110223_mhd_mks_profiles_all2.pkl']
+  #listOfPickles = ['../data_products/110123_n4_reproduce_082423_profiles_all2.pkl']
+  #listOfPickles = ['../data_products/110723_n4_beta10_profiles_all2.pkl']
+  #listOfPickles = ['../data_products/110823_n4_moverin_profiles_all2.pkl']
+  #listOfPickles = ['../data_products/111023_n4_locff_profiles_all2.pkl']
+  listOfPickles = ['../data_products/111423_n4_wks_profiles_all2.pkl']
 
   listOfLabels = None
   plot_dir = "../plots/test"
   cta=0 # time evolution
   avg_frac=0.5
   show_rscale=True
-  num_time_chunk=4 #8 #4 #2 #
+  num_time_chunk=6 #8 #4 #2 #
   boxcar_factor=0 #4 #2 #
   colors=None
-  xlim=[2,1e4] # 2e8] #
+  xlim=[2,1e4] #2e8] # 
   show_div=False # temp
+  '''
 
   # colors, linestyles, directory
-  linestyles=['-','-','-',':',':', '--', ':']
+  linestyles=['-','-','-','-','-','-','-', '--', ':']
   os.makedirs(plot_dir, exist_ok=True)
 
-  for quantity in ['K', 'eta', 'etaMdot', 'beta', 'Edot', 'Mdot', 'rho', 'u', 'T', 'abs_u^r', 'abs_u^phi', 'abs_u^th', 'u^r', 'u^phi',  'u^th']: #'abs_Omega', 'Pg', 
+  for quantity in ['b', 'K', 'eta', 'etaMdot', 'beta', 'Edot', 'Mdot', 'rho', 'u', 'T', 'abs_u^r', 'abs_u^phi', 'abs_u^th', 'u^r', 'u^phi',  'u^th']: #'abs_Omega', 'Pg', 
     output = plot_dir+"/profile_"+quantity+".pdf"
     #output = None
     ylim = [None,[1e-4,10]][(quantity in ['Mdot'])] # [1e-3,10] if Mdot, None otherwise
     ylim = [ylim,[1e-4,2]][(quantity in ['abs_Omega'])] #
+    ylim = [ylim,[1e-3,4e-1]][(quantity in ['eta'])] #
+    #ylim = [None,[1e-9,3e-1]][(quantity in ['rho'])]
     plotProfiles(listOfPickles, quantity, output=output, zone_time_average_fraction=avg_frac, cycles_to_average=cta, color_list=colors, linestyle_list=linestyles, label_list=listOfLabels, rescale=False, \
-    trim_zone=True, flip_sign=(quantity in ['u^r']), xlim=xlim, ylim=ylim ,show_gizmo=("gizmo" in plot_dir), show_rscale=show_rscale, num_time_chunk=num_time_chunk, boxcar_factor=boxcar_factor, show_divisions=show_div, show_rb=show_rb, average_factor=2)# , tmax=2130)# 2130 is when 20tB has passed for the HD run
+    show_init=0, trim_zone=True, flip_sign=(quantity in ['u^r']), xlim=xlim, ylim=ylim ,show_gizmo=("gizmo" in plot_dir), show_rscale=show_rscale, num_time_chunk=num_time_chunk, boxcar_factor=boxcar_factor, show_divisions=show_div, show_rb=show_rb, average_factor=2, tmax_list=tmax_list)#2130)# 2130 is when 20tB has passed for the HD run

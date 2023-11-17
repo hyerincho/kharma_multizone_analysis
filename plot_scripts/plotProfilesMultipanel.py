@@ -27,7 +27,7 @@ def kpc2rg(R,M=6.5e9*u.Msun):
 #variableToLatex['T'] = '$\Theta = k\,T/(\mu\, c^2)$'
 
 def plotProfilesMultipanel(listOfPickles, listOfLabels=None, listOfColors=None, listOfLinestyles=None, output=None, quantities=['Mdot', 'rho', 'T', 'u^r'], figsize=(12,8), rescale=False, rescaleRadius=10, rescaleValue=1, \
-    fontsize=18, xlim=(2,4e9), ylim=(1e-2,10), show_init=True, show_gizmo=True, cta=10, boxcar_factor=0, average_factor=2, show_rscale=False, show_mdotinout=None, show_pc=False, show_legend=None, show_eta_axhline=True, set_beta_ylim=False,eta_norm_Bondi=False, row= None, tmax_list=None, lw= 2):
+    fontsize=18, xlim=(2,4e9), ylim=(1e-2,10), show_init=False, show_gizmo=True, cta=10, boxcar_factor=0, average_factor=2, show_rscale=False, show_mdotinout=None, show_pc=False, show_legend=None, show_eta_axhline=True, set_beta_ylim=False,eta_norm_Bondi=False, row= None, tmax_list=None, lw= 2):
     
     matplotlib_settings()
  
@@ -40,7 +40,7 @@ def plotProfilesMultipanel(listOfPickles, listOfLabels=None, listOfColors=None, 
     if listOfColors is None:
         listOfColors = [None]*len(listOfPickles)
     if listOfLinestyles is None:
-        listOfLinestyles = [None]*len(listOfPickles)
+        listOfLinestyles = ['solid']*len(listOfPickles)
 
     if show_pc:
         r_bondi = np.logspace(np.log10(max(2,xlim[0])), np.log10(xlim[1]), 50)
@@ -109,7 +109,9 @@ def plotProfilesMultipanel(listOfPickles, listOfLabels=None, listOfColors=None, 
     if show_legend is None:
         for i in range(2): ax1d[i].legend(loc='best', frameon=False, fontsize=fontsize-4, handlelength=handlelength)
     else: 
-        for i in show_legend: ax1d[i].legend(loc='best', frameon=False, fontsize=fontsize-4, handlelength=handlelength)
+        for i in show_legend:
+            #ax1d[i].legend(loc='best', frameon=False, fontsize=fontsize-4, handlelength=handlelength)
+            ax1d[i].legend(bbox_to_anchor=(0.4,1.1), ncol=4, frameon=False, fontsize=fontsize-4, handlelength=handlelength)
 
     # panel numbers
     for i in range(len(ax1d)): ax1d[i].text(0.02, 0.92, '('+string.ascii_lowercase[i]+')',transform=ax1d[i].transAxes, fontsize=fontsize-2)#, bbox=dict(facecolor='w', edgecolor='k', pad=5.0))
@@ -215,17 +217,19 @@ def plotLetter():
     cta = 0
     boxcar_factor = 4
     rescaleValue = bondi.get_quantity_for_rarr([1e5], 'Mdot', rs=np.sqrt(1e5))[0]
-    plotProfilesMultipanel(listOfPickles, listOfLabels=listOfLabels, listOfColors=listOfColors, listOfLinestyles=listOfLinestyles, show_pc=True, \
+    plotProfilesMultipanel(listOfPickles, listOfLabels=listOfLabels, listOfColors=listOfColors, listOfLinestyles=listOfLinestyles, show_pc=True,show_eta_axhline=1, show_init=0, \
             xlim=xlim, ylim=ylim, show_gizmo=False, show_rscale='rho_T_phib', show_mdotinout=slice(1,2), quantities=quantities, cta=cta, boxcar_factor=boxcar_factor,\
-            set_beta_ylim=1,average_factor=2, row=3, figsize=figsize, rescaleValue=rescaleValue, lw=3, tmax_list=[170,9], output='../plots/letter_profiles.pdf')
+            set_beta_ylim=1,average_factor=2, row=3, figsize=figsize, rescaleValue=rescaleValue, lw=3, tmax_list=[227,9], output='../plots/letter_profiles.pdf')# tmax_list=[170,9] tmax_list=[600,9] 107,9
 
 def plotN8ResComp():
-    listOfPickles = ['../data_products/'+dirname for dirname in ['production_runs/072823_beta01_128_profiles_all2.pkl', '091423_n8_48_profiles_all2.pkl', '082423_n8_profiles_all2.pkl', '091523_n8_96_fmks_profiles_all2.pkl', '091723_n8_beta10_profiles_all2.pkl']] #, '091423_n8_96_profiles_all2.pkl'
-    listOfLabels = [r'$128^3$, fmks', r'(i) $48^3$', r'(ii) $64^3$', r'(iii) $96^3$, fmks', r'(iv) $64^3$, $\beta$10'] #r'$96^3$', 
-    listOfColors = ['k', 'tab:green','tab:blue', 'm', 'y'] #,'tab:orange'
-    listOfLinestyles = ['solid', 'solid', 'solid','solid', 'solid','solid']
+    listOfPickles = ['../data_products/'+dirname for dirname in ['production_runs/072823_beta01_128_profiles_all2.pkl', '091423_n8_48_profiles_all2.pkl', '082423_n8_profiles_all2.pkl', '091523_n8_96_fmks_profiles_all2.pkl', '091723_n8_beta10_profiles_all2.pkl', '102323_n8_constrho_profiles_all2.pkl', '102423_n8_bondi_profiles_all2.pkl']] #, '091423_n8_96_profiles_all2.pkl'
+    listOfLabels = [r'$128^3$, fmks', r'(i) $48^3$', r'(ii) $64^3$', r'(iii) $96^3$, fmks', r'(iv) $64^3$, $\beta$10', r'(v) $64^3$, const', r'(vi) $64^3$, bondi'] #r'$96^3$', 
+    #listOfColors = ['k', 'tab:green','tab:blue', 'm', 'y', 'b', 'deepskyblue'] #,'tab:orange'
+    cmap = plt.get_cmap('gist_rainbow')
+    listOfColors = ['k'] + list(cmap(np.linspace(0.05,0.9,len(listOfPickles)-1)))
+    listOfLinestyles = None
     quantities = ['rho', 'T','Mdot', 'eta', 'phib', 'beta']
-    figsize=(14,8)
+    figsize=(15,8)
     xlim = (2, 2e8)
     ylim = (1e-4,2)
     cta= 0
@@ -233,7 +237,7 @@ def plotN8ResComp():
     boxcar_factor = 4
     plotProfilesMultipanel(listOfPickles, listOfLabels=listOfLabels, listOfColors=listOfColors, listOfLinestyles=listOfLinestyles, \
             xlim=xlim, ylim=ylim, show_gizmo=False, show_rscale=False, show_legend=[0], figsize=figsize, quantities=quantities, rescaleValue=rescaleValue, cta=cta, boxcar_factor=boxcar_factor,\
-            set_beta_ylim=1,average_factor=2,eta_norm_Bondi=0,tmax_list=9, output='../plots/letter_rescomp_profiles.pdf')
+            set_beta_ylim=1,average_factor=2,eta_norm_Bondi=0,tmax_list=[9,9,9,9,9,8.7,12], output='../plots/letter_rescomp_profiles.pdf')
 
 def plotProposal():
     # For the proposal. 6 panel showing rho, T, phib, beta, Mdot, eta
@@ -269,13 +273,14 @@ def plotBABAM():
             xlim=xlim, ylim=ylim, show_gizmo=False, show_rscale='rho_T_phib', quantities=quantities, cta=cta, boxcar_factor=boxcar_factor, figsize=figsize,\
             set_beta_ylim=1,average_factor=2, rescaleValue=rescaleValue, lw=3, tmax_list=[1000,9], output='../plots/babam_profiles.png')
 
+
 if __name__ == '__main__':
     #plotHydro()
     #plotMHDtest()
     #plotMHD()
     #plotLetterPrims()
     #plotLetterCons()
-    plotLetter()
-    #plotN8ResComp()
+    #plotLetter()
+    plotN8ResComp()
     #plotProposal()
     #plotBABAM()
