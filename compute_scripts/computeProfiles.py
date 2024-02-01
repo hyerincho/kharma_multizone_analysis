@@ -85,6 +85,7 @@ def computeAllProfiles(runName, outPickleName, quantities=['Mdot', 'rho', 'u', '
   else:
     nzone = None
   r_sonic = None
+  spin = None
   base = None
   listOfListOfProfiles = []
   listOfListOfTimes= []
@@ -133,8 +134,11 @@ def computeAllProfiles(runName, outPickleName, quantities=['Mdot', 'rho', 'u', '
       if onezone_override: nzone_eff = nzone
       if r_sonic is None:
         r_sonic = dump['rs']
+      if spin is None:
+        spin = dump["a"]
       if base is None:
-        base = float(dump['base'])
+          try: base = float(dump['base'])
+          except: base = 8.
       
       listOfProfiles.append(computeProfileSet(dump, quantities=quantities, mass_weight=mass_weight))
       listOfTimes.append(pyharm.io.get_dump_time(file))
@@ -142,6 +146,7 @@ def computeAllProfiles(runName, outPickleName, quantities=['Mdot', 'rho', 'u', '
     #Just need this value once for a given annulus.
     radii.append(dump['r1d'])
     if save_zones:
+      # TODO: combine_in_ann's case is different.
       zone = (nzone_eff-1) - int(np.log(dump['r_in'])/np.log(base))
       zones.append(zone)
     listOfListOfProfiles.append(listOfProfiles)
@@ -167,6 +172,7 @@ def computeAllProfiles(runName, outPickleName, quantities=['Mdot', 'rho', 'u', '
   D['profiles'] = listOfListOfProfiles
   D['times'] = listOfListOfTimes
   D['r_sonic'] = r_sonic
+  D['spin'] = spin
   if save_zones: D['zones'] = zones
   D['base'] = base
 

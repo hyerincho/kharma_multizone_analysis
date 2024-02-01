@@ -27,7 +27,7 @@ def kpc2rg(R,M=6.5e9*u.Msun):
 #variableToLatex['T'] = '$\Theta = k\,T/(\mu\, c^2)$'
 
 def plotProfilesMultipanel(listOfPickles, listOfLabels=None, listOfColors=None, listOfLinestyles=None, output=None, quantities=['Mdot', 'rho', 'T', 'u^r'], figsize=(12,8), rescale=False, rescaleRadius=10, rescaleValue=1, \
-    fontsize=18, xlim=(2,4e9), ylim=(1e-2,10), show_init=False, show_gizmo=True, cta=10, boxcar_factor=0, average_factor=2, show_rscale=False, show_mdotinout=None, show_pc=False, show_legend=None, show_eta_axhline=True, set_beta_ylim=False,eta_norm_Bondi=False, row= None, tmax_list=None, lw= 2):
+    fontsize=18, xlim=(2,4e9), ylim=(1e-2,10), show_init=False, show_gizmo=True, cta=10, boxcar_factor=0, average_factor=2, show_rscale=False, show_mdotinout=None, show_pc=False, show_legend=None, show_eta_axhline=True, show_band_unconverged=False, set_beta_ylim=False,eta_norm_Bondi=False, row= None, tmax_list=None, lw= 2):
     
     matplotlib_settings()
  
@@ -100,6 +100,8 @@ def plotProfilesMultipanel(listOfPickles, listOfLabels=None, listOfColors=None, 
         for col in range(axarr.shape[0]): axarr[col].set_xlabel('$r \ [r_g]$', fontsize=fontsize)
     else: 
         for col in range(axarr.shape[1]): axarr[-1,col].set_xlabel('$r \ [r_g]$', fontsize=fontsize)
+    if show_band_unconverged:
+        for ax in ax1d: ax.axvspan(1e6,xlim[1],facecolor='gray',linewidth=0.0,alpha=0.5)
 
     #for run_index in range(len(listOfPickles)):
     #    ax1d[lgd_ax].plot([], [], color=listOfColors[run_index], lw=2, label=listOfLabels[run_index], ls=listOfLinestyles[run_index])
@@ -206,7 +208,7 @@ def plotLetterCons():
 
 def plotLetter():
     # For the letter. 6 panel showing rho, T, phib, beta, Mdot, eta
-    listOfPickles = ['../data_products/'+dirname for dirname in ['bondi_multizone_030723_bondi_128^3_profiles_all2.pkl', 'production_runs/072823_beta01_128_profiles_all2.pkl']]
+    listOfPickles = ['../data_products/'+dirname for dirname in ['bondi_multizone_030723_bondi_128^3_profiles_all2.pkl']]#, 'production_runs/072823_beta01_128_profiles_all2.pkl']]
     listOfLabels = ['Bondi HD', 'Bondi MHD']
     listOfColors = ['tab:red', 'k', 'tab:blue', 'tab:orange', 'tab:green'] #'k', 
     listOfLinestyles = ['solid', 'solid', 'dashdot', 'dotted']
@@ -257,10 +259,10 @@ def plotProposal():
             set_beta_ylim=1,average_factor=2, rescaleValue=rescaleValue, lw=3, tmax_list=[9,9], output='../plots/proposal_mhd_profiles.pdf')
 
 def plotBABAM():
-    # For BABAM conference lightning talk 4 panel showing rho, T,  Mdot, eta
-    listOfPickles = [] #['../data_products/'+dirname for dirname in ['bondi_multizone_030723_bondi_128^3_profiles_all2.pkl']] #,'082423_n8_profiles_all2.pkl']]
+    # For BABAM conference lightning talk 2 panel showing rho, eta
+    listOfPickles = ['../data_products/'+dirname for dirname in ['bondi_multizone_030723_bondi_128^3_profiles_all2.pkl','production_runs/072823_beta01_128_profiles_all2.pkl']] #,'082423_n8_profiles_all2.pkl']]
     listOfLabels = ['HD','MHD']
-    listOfColors = ['k', 'tab:red', 'tab:green', 'tab:blue', 'tab:orange'] #'k', 
+    listOfColors = ['tab:red', 'k', 'tab:red', 'tab:green', 'tab:blue', 'tab:orange'] #'k', 
     listOfLinestyles = ['solid', 'solid', 'dashdot', 'dotted']
     quantities = ['rho', 'eta']
     figsize=(14,6)
@@ -269,9 +271,9 @@ def plotBABAM():
     cta = 0
     boxcar_factor = 4
     rescaleValue = bondi.get_quantity_for_rarr([1e5], 'Mdot', rs=np.sqrt(1e5))[0]
-    plotProfilesMultipanel(listOfPickles, listOfLabels=listOfLabels, listOfColors=listOfColors, listOfLinestyles=listOfLinestyles, show_pc=True, show_eta_axhline=False, \
-            xlim=xlim, ylim=ylim, show_gizmo=False, show_rscale='rho_T_phib', quantities=quantities, cta=cta, boxcar_factor=boxcar_factor, figsize=figsize,\
-            set_beta_ylim=1,average_factor=2, rescaleValue=rescaleValue, lw=3, tmax_list=[1000,9], output='../plots/babam_profiles.png')
+    plotProfilesMultipanel(listOfPickles, listOfLabels=listOfLabels, listOfColors=listOfColors, listOfLinestyles=listOfLinestyles, show_pc=True, show_eta_axhline=1, show_init=0, \
+            xlim=xlim, ylim=ylim, show_gizmo=False, show_rscale='rho_T_phib', show_band_unconverged=1, quantities=quantities, cta=cta, boxcar_factor=boxcar_factor, figsize=figsize,\
+            set_beta_ylim=1,average_factor=2, rescaleValue=rescaleValue, lw=3, tmax_list=[227,9], output='../plots/babam_profiles.png') # 1000
 
 
 if __name__ == '__main__':
@@ -281,6 +283,6 @@ if __name__ == '__main__':
     #plotLetterPrims()
     #plotLetterCons()
     #plotLetter()
-    plotN8ResComp()
+    #plotN8ResComp()
     #plotProposal()
-    #plotBABAM()
+    plotBABAM()

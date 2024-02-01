@@ -13,6 +13,10 @@ import h5py
 
 from plotSlices import t_total_to_t_atB, t_atB_to_t_total
 
+default_params = {'xlim': None, 'show_rscale': False, 'show_divisions': True, 'show_rb': False,
+        'boxcar_factor': 0, 'tmax_list': None, 'average_factor': 2, 'linestyle_list': None,
+        'label_list': None, 'rescale': False, 'show_init': 0, 'trim_zone': True}
+
 def readQuantity(dictionary, quantity):
 
   invert = False
@@ -92,6 +96,7 @@ def assignTimeBins(D, profiles, ONEZONE=False, num_time_chunk=4, zone_time_avera
   try: base = D["base"]
   except: base = 8
 
+  #pdb.set_trace()
   for i,profile in enumerate(profiles):
     times = D["times"][i]
     run_idx = D["runIndices"][i]
@@ -184,7 +189,7 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
     listOfPickles = [listOfPickles]
 
   if linestyle_list is None:
-    linestyle_list = [None]*len(listOfPickles)
+    linestyle_list = ['-']*len(listOfPickles)
   times_list = [None]*len(listOfPickles)
 
   #Changes some defaults.
@@ -436,7 +441,7 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
         else:
             boxcar_avged = uniform_filter1d(values_plot[order], size=n_radii//boxcar_factor) # (07/12/23) boxcar averaging
         ax.plot(r_plot[order], boxcar_avged, color=colors[b], ls=linestyle_list[sim_index], lw=lw, label=label)
-        if quantity=='eta' or(num_time_chunk == 1): ax.plot(r_plot[order], -boxcar_avged, color=colors[b], ls=':', lw=lw+1)
+        if (quantity=='eta' or (num_time_chunk == 1)) and linestyle_list[sim_index]!='': ax.plot(r_plot[order], -boxcar_avged, color=colors[b], ls=':', lw=lw+1)
         
         if show_init and (quantity == "rho" or quantity == "T" or quantity=="beta" or quantity=='u^r'):
             # show initial conditions
@@ -538,7 +543,7 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
 
   elif show_rscale!=False:
     # show density scalings
-    if "rho" in quantity and (show_rscale==True or "rho" in show_rscale): # and "rot" in dirtag:
+    if "rho" in quantity and (show_rscale==True or "rho" in show_rscale):
         rarr= np.logspace(np.log10(2),np.log10(r_sonic),20) #*1000
         factor=7e-8*1e5/r_sonic**2#7e-7
         ax.plot(rarr,np.power(rarr/1e3,-1)*factor,'g-',alpha=0.5,lw=2)#,label=r'$r^{-1}$')
@@ -579,166 +584,218 @@ def plotProfiles(listOfPickles, quantity, output=None, colormap='turbo', color_l
       fig.savefig(output)
       plt.close(fig)
 
+def compare_n4_Bstrong(dirtag='112723_strong_field', **kwargs):
+    # 2b) strong field test
+    dictOfAll = {}
+    #dictOfAll['oz'] = ['production_runs/072823_beta01_onezone_profiles_all2.pkl', 'k']
+    #dictOfAll['oz_MKS'] = ['100223_onezone_n4_profiles_all2.pkl', 'k']
+    dictOfAll['oz_WKS0.04'] = ['122723_n4_onezone_wks0.04_profiles_all2.pkl','k']
+    dictOfAll['oz_WKS128'] = ['111623_onezone_wks_128_profiles_all2.pkl', 'gray']
+    #dictOfAll['cap'] = ['101623_n4_cap_profiles_all2.pkl','b']
+    #dictOfAll['loc'] = ['101623_n4_locff_profiles_all2.pkl','r']
+    #dictOfAll['old']=['082423_n4_profiles_all2.pkl','m']
+    #dictOfAll['reproduce']=['102423_n4_incorrectrb_profiles_all2.pkl','g']
+    dictOfAll['n4MKS']=['110623_n4_reproduce_082423_profiles_all2.pkl','b']
+    #dictOfAll['n4FMKS']=['112923_n4_fmks_profiles_all2.pkl','g']
+    #dictOfAll['n4WKSlin'] = ['112923_n4_wks_lin_profiles_all2.pkl','r']
+    dictOfAll['n4WKS0.02'] = ['111423_n4_wks_profiles_all2.pkl','r']
+    dictOfAll['n4WKS0.03'] = ['122023_n4_wks_smth0.03_profiles_all2.pkl','g']
+    dictOfAll['n4WKS0.04'] = ['122023_n4_wks_smth0.04_profiles_all2.pkl','y']
+    dictOfAll['n4WKS128'] = ['delta/111523_n4_wks_128_profiles_all2.pkl','m']
+    listOfPickles = []
+    listOfLabels =[]
+    colors = []
+    for key,value in dictOfAll.items():
+        listOfPickles += ['../data_products/'+value[0]]
+        listOfLabels += [key]
+        colors += [value[1]]
+    plot_dir = '../plots/'+dirtag
+    kwargs['zone_time_average_fraction'] = 0.5 #0.1 #0 #
+    kwargs['cycles_to_average'] = 0 #2 
+    kwargs['color_list'] = colors
+    kwargs['label_list'] = listOfLabels
+    kwargs['num_time_chunk'] = 1
+    kwargs['xlim']=[2,3e4] #4.5e3]
+    kwargs['tmax_list']=[None,None,30,30,30,30, 30] #None, None, 80, None] #
+    
+    plot_common(plot_dir, listOfPickles, **kwargs)
+
+def compare_n8(dirtag='112723_n8', **kwargs):
+    # 2c) n=8
+    dictOfAll = {}
+    if 'kerr' not in dirtag:
+        #dictOfAll['gizmo_1d'] = ['101123_gizmo_mhd_profiles_all2.pkl','k']
+        #dictOfAll['gizmo_3d'] = ['101123_gizmo_mhd_3d_profiles_all2.pkl','gray']
+        dictOfAll['old'] = ['082423_n8_profiles_all2.pkl','yellow']
+        dictOfAll['128'] = ['production_runs/072823_beta01_128_profiles_all2.pkl', 'k']
+        dictOfAll['MKSlocff'] = ['102323_n8_locff_profiles_all2.pkl', 'r'] 
+        dictOfAll['WKSlocff'] = ['011424_n8_locff_smth0.03_profiles_all2.pkl', 'm'] 
+        dictOfAll['MKScap'] = ['110223_mhd_mks_profiles_all2.pkl', 'b'] 
+        dictOfAll['WKScap128'] = ['110523_mhd_wks_128_profiles_all2_save.pkl', 'g']
+        dictOfAll['WKScap_like_n4'] = ['111623_n8_cap_like_n4_profiles_all2.pkl', 'y']
+        #dictOfAll['WKSlocff_r_gamma'] = ['112823_n8_locff_r_gamma_profiles_all2.pkl', 'pink']
+    else:
+        colors = plt.cm.gnuplot(np.linspace(0.9,0.3,5))
+        dictOfAll['Sch'] = ['011424_n8_locff_smth0.03_profiles_all2.pkl', 'k']
+        dictOfAll['a0.1'] = ['010524_a0.1_profiles_all2.pkl', colors[0]]
+        dictOfAll['a0.3'] = ['010524_a0.3_profiles_all2.pkl', colors[1]]
+        dictOfAll['a0.5'] = ['010524_a0.5_profiles_all2.pkl', colors[2]]
+        dictOfAll['a0.7'] = ['011224_a0.7_profiles_all2.pkl', colors[3]]
+        dictOfAll['a0.9'] = ['011224_a0.9_profiles_all2.pkl', colors[4]]
+    listOfPickles = []
+    listOfLabels =[]
+    colors = []
+    for key,value in dictOfAll.items():
+        listOfPickles += ['../data_products/'+value[0]]
+        listOfLabels += [key]
+        colors += [value[1]]
+    plot_dir = '../plots/' + dirtag #110123_testtrun' #'../plots/103023_gizmo_1d_v_3d'
+    kwargs['zone_time_average_fraction'] = 0.5
+    kwargs['cycles_to_average'] = 0 # 40
+    kwargs['color_list'] = colors
+    kwargs['label_list'] = listOfLabels
+    kwargs['num_time_chunk'] = 1
+    kwargs['xlim'] = [2,2e8]
+    kwargs['tmax_list'] = None #[10,10,None]
+    #boxcar_factor=4 #2
+
+    plot_common(plot_dir, listOfPickles, **kwargs)
+
+def plot_common(plot_dir, listOfPickles, **kwargs):
+    os.makedirs(plot_dir, exist_ok=True)
+      
+    for quantity in ['b', 'K', 'eta', 'etaMdot', 'beta', 'Edot', 'Mdot', 'rho', 'u', 'T', 'abs_u^r', 'abs_u^phi', 'abs_u^th', 'u^r', 'u^phi',  'u^th']: #'abs_Omega', 'Pg', 
+        output = plot_dir+"/profile_"+quantity+".pdf"
+        ylim = [None,[1e-4,10]][(quantity in ['Mdot'])] # [1e-3,10] if Mdot, None otherwise
+        ylim = [ylim,[1e-4,2]][(quantity in ['abs_Omega'])] #
+        ylim = [ylim,[1e-3,4e-1]][(quantity in ['eta'])] #
+        if 'kerr' in plot_dir: ylim = [ylim,[1e-3,4]][(quantity in ['eta'])] # non-zero spin
+        #ylim = [ylim,[1e-5,1e-1]][(quantity in ['eta'])] # HD + jitter
+        plotProfiles(listOfPickles, quantity, output=output, flip_sign=(quantity in ['u^r']), ylim=ylim, show_gizmo=("gizmo" in plot_dir), **kwargs)
+
 if __name__ == '__main__':
+    #compare_n4_Bstrong(**default_params)
+    #compare_n8(**default_params)
+    #compare_n8(dirtag="012124_n8_compare_kerr", **default_params)
 
-  #TESTING
-  
-  '''
-  listOfPickles = ['../data_products/bondi_multizone_050423_onezone_bflux0_1e-8_2d_n4_profiles_all.pkl']
-  listOfLabels = ['n=1']
-  listOfPickles = ['../data_products/bondi_multizone_050423_bflux0_1e-8_2d_n4_profiles_all.pkl']
-  listOfLabels = ['n=4']
-  '''
-  
-  # default plotting setting. change below if needed
-  xlim=None
-  show_rscale=False
-  show_div=True
-  show_rb=False
-  boxcar_factor=0
-  tmax_list=None
-  
-  # 1a) Bondi
-  '''
-  listOfPickles = ['../data_products/bondi_multizone_030723_bondi_128^3_profiles_all.pkl']
-  listOfLabels = [''] #'GIZMO, no extg', 
-  plot_dir = '../plots/052923_bondi'
-  avg_frac=0.
-  cta=1
-  xlim=[2,1e8]
-  '''
+    #TESTING
+    
+    '''
+    listOfPickles = ['../data_products/bondi_multizone_050423_onezone_bflux0_1e-8_2d_n4_profiles_all.pkl']
+    listOfLabels = ['n=1']
+    listOfPickles = ['../data_products/bondi_multizone_050423_bflux0_1e-8_2d_n4_profiles_all.pkl']
+    listOfLabels = ['n=4']
+    '''
+    
+    # default plotting setting. change below if needed
+    xlim=None
+    show_rscale=False
+    show_div=True
+    show_rb=False
+    boxcar_factor=0
+    tmax_list=None
+    average_factor=2
+    
+    # 1a) Bondi
+    '''
+    listOfPickles = ['../data_products/bondi_multizone_030723_bondi_128^3_profiles_all.pkl']
+    listOfLabels = [''] #'GIZMO, no extg', 
+    plot_dir = '../plots/052923_bondi'
+    avg_frac=0.
+    cta=1
+    xlim=[2,1e8]
+    '''
 
-  # 1b&c) GIZMO
-  '''
-  listOfPickles = ['../data_products/production_runs/gizmo_extg_1e8_profiles_all.pkl', '../data_products/bondi_multizone_052523_gizmo_n8_64^3_noshock_profiles_all.pkl']
-  listOfLabels = ['Ext. Grav.', 'No Ext. Grav.']
-  plot_dir = '../plots/052923_gizmo'
-  avg_frac=0.5
-  cta=10
-  num_time_chunk=-1
-  show_div=False
-  show_rb=True
+    # 1b&c) GIZMO
+    '''
+    listOfPickles = ['../data_products/production_runs/gizmo_extg_1e8_profiles_all.pkl', '../data_products/bondi_multizone_052523_gizmo_n8_64^3_noshock_profiles_all.pkl']
+    listOfLabels = ['Ext. Grav.', 'No Ext. Grav.']
+    plot_dir = '../plots/052923_gizmo'
+    avg_frac=0.5
+    cta=10
+    num_time_chunk=-1
+    show_div=False
+    show_rb=True
 
-  xlim=[2,4e9]
-  colors = ['tab:blue','tab:green', 'tab:red', 'k','r', 'b',  'g', 'm', 'c', 'y']
-  '''
+    xlim=[2,4e9]
+    colors = ['tab:blue','tab:green', 'tab:red', 'k','r', 'b',  'g', 'm', 'c', 'y']
+    '''
 
-  # 2a) weak field test (n=4)
-  '''
-  listOfPickles = ['../data_products/'+dirname for dirname in ['bondi_multizone_050423_onezone_bflux0_1e-8_2d_n4_profiles_all2.pkl', 'bondi_multizone_050423_bflux0_1e-8_2d_n4_profiles_all.pkl']]
-  listOfLabels = ['n=1', 'n=4']
-  plot_dir = '../plots/052923_weakfield'
-  avg_frac=0
-  cta=1
-  xlim=[2,3.5e4]
-  colors = ['k','r', 'b',  'g', 'm', 'c', 'y']
-  '''
+    # 2a) weak field test (n=4)
+    '''
+    listOfPickles = ['../data_products/'+dirname for dirname in ['bondi_multizone_050423_onezone_bflux0_1e-8_2d_n4_profiles_all2.pkl', 'bondi_multizone_050423_bflux0_1e-8_2d_n4_profiles_all.pkl']]
+    listOfLabels = ['n=1', 'n=4']
+    plot_dir = '../plots/052923_weakfield'
+    avg_frac=0
+    cta=1
+    xlim=[2,3.5e4]
+    colors = ['k','r', 'b',  'g', 'm', 'c', 'y']
+    '''
 
-  # 2b) strong field test
-  dictOfAll = {}
-  dictOfAll['oz'] = ['production_runs/072823_beta01_onezone_profiles_all2.pkl', 'k']
-  dictOfAll['oz_new'] = ['100223_onezone_n4_profiles_all2.pkl', 'y']
-  #dictOfAll['32_r^1'] = ['062623_n3_1_profiles_all2.pkl', 'y']
-  #dictOfAll['beta1e0'] = ['071023_n3_beta01_profiles_all2.pkl', 'lightgreen']
-  dictOfAll['cap'] = ['101623_n4_cap_profiles_all2.pkl','b']
-  dictOfAll['loc'] = ['101623_n4_locff_profiles_all2.pkl','r']
-  dictOfAll['old']=['082423_n4_profiles_all2.pkl','m']
-  #dictOfAll['reproduce']=['102423_n4_incorrectrb_profiles_all2.pkl','g']
-  dictOfAll['reproduce']=['110623_n4_reproduce_082423_profiles_all2.pkl','g']
-  dictOfAll['WKS'] = ['111423_n4_wks_profiles_all2.pkl','c']
-  listOfPickles = []
-  listOfLabels =[]
-  colors = []
-  for key,value in dictOfAll.items():
-      listOfPickles += ['../data_products/'+value[0]]
-      listOfLabels += [key]
-      colors += [value[1]]
-  plot_dir = '../plots/101823_strongfield'
-  avg_frac=0.1 #0 #
-  cta=0 #2 #
-  show_rscale=False
-  num_time_chunk=1
-  xlim=[2,3e4] #4.5e3]
-  tmax_list=[None,None,30,30,30,30, 30] #None, None, 90, None] #
 
-  # 2c) n=8
-  '''
-  dictOfAll = {}
-  #dictOfAll['64_rst_b64'] = ['080823_rst64_testb64_profiles_all2.pkl','crimson']
-  #dictOfAll['r^-3/2'] = ['062223_diffinit_bondi_profiles_all2.pkl','b']
-  #dictOfAll['r^-1'] = ['062023_0.02tff_ur0_profiles_all2.pkl','k']
-  #dictOfAll['const'] = ['062623_constinit_profiles_all2.pkl','r']
-  #dictOfAll['gizmo_1d'] = ['101123_gizmo_mhd_profiles_all2.pkl','k']
-  #dictOfAll['gizmo_3d'] = ['101123_gizmo_mhd_3d_profiles_all2.pkl','b']
-  #dictOfAll['64_rst_longtin'] = ['081723_rst64_longtin_profiles_all2.pkl', 'c']
-  dictOfAll['r^-1'] = ['082423_n8_profiles_all2.pkl','k']
-  #dictOfAll['128'] = ['production_runs/072823_beta01_128_profiles_all2.pkl', 'm']
-  #dictOfAll['32_hd'] = ['062623_hd_ur0_profiles_all2.pkl','c']
-  dictOfAll['cap'] = ['102323_n8_cap_profiles_all2.pkl', 'b'] 
-  dictOfAll['locff'] = ['102323_n8_locff_profiles_all2.pkl', 'r'] 
-  listOfPickles = []
-  listOfLabels =[]
-  colors = []
-  for key,value in dictOfAll.items():
-      listOfPickles += ['../data_products/'+value[0]]
-      listOfLabels += [key]
-      colors += [value[1]]
-  plot_dir = '../plots/110123_testtrun' #'../plots/103023_gizmo_1d_v_3d'
-  avg_frac=0.5
-  cta=0 # 40
-  num_time_chunk = 1
-  xlim=[2,2e8]
-  show_rscale=False #True
-  boxcar_factor=4 #2
-  tmax_list=[10,10,None]
-  '''
+    # test
+    #listOfPickles = ['../data_products/bondi_multizone_022723_jit0.3_new_coord_profiles_all2.pkl']
+    #listOfPickles = ['../data_products/bondi_multizone_030723_bondi_128^3_profiles_all2.pkl']
+    #listOfPickles = ['../data_products/production_runs/072823_beta01_128_profiles_all2.pkl']
+    #listOfPickles = ['../data_products/production_runs/072823_beta01_onezone_profiles_all2.pkl']
+    #listOfPickles = ['../data_products/082423_n4_profiles_all2.pkl']
+    #listOfPickles = ['../data_products/082423_n8_profiles_all2.pkl']
+    #listOfPickles = ['../data_products/101123_gizmo_mhd_3d_profiles_all2.pkl'] # 3d
+    #listOfPickles = ['../data_products/103023_hd_jitter_profiles_all2.pkl']
+    #listOfPickles = ['../data_products/110223_mhd_mks_profiles_all2.pkl']
+    #listOfPickles = ['../data_products/110123_n4_reproduce_082423_profiles_all2.pkl']
+    #listOfPickles = ['../data_products/110523_mhd_wks_128_profiles_all2.pkl']
+    #listOfPickles = ['../data_products/110723_n4_beta10_profiles_all2.pkl']
+    #listOfPickles = ['../data_products/110823_n4_moverin_profiles_all2.pkl']
+    #listOfPickles = ['../data_products/110923_mhd_kharma_next_profiles_all2.pkl']
+    #listOfPickles = ['../data_products/111023_n4_locff_profiles_all2.pkl']
+    #listOfPickles = ['../data_products/111123_n4_onezone_wks_profiles_all2.pkl']
+    #listOfPickles = ['../data_products/111423_n4_wks_profiles_all2.pkl']
+    #listOfPickles = ['../data_products/111623_n8_locff_profiles_all2.pkl']
+    #listOfPickles = ['../data_products/111723_test_r_gamma_profiles_all2.pkl']
+    #listOfPickles = ['../data_products/110623_n4_reproduce_082423_profiles_all2.pkl']
+    #listOfPickles = ['../data_products/111623_n8_cap_like_n4_profiles_all2.pkl']
+    #listOfPickles = ['../data_products/112823_n8_locff_r_gamma_profiles_all2.pkl']
+    #listOfPickles = ['../data_products/111623_onezone_wks_128_profiles_all2.pkl']
+    #listOfPickles = ['../data_products/112723_test_r_gamma_3_profiles_all2.pkl']
+    #listOfPickles = ['../data_products/122723_n4_onezone_wks0.03_profiles_all2.pkl']
+    #listOfPickles = ['../data_products/112923_n8_locff_r_gamma_eta_constant/cs_always_betagammamax_profiles_all2.pkl']
+    #listOfPickles = ['../data_products/112923_n4_fmks_profiles_all2.pkl']
+    #listOfPickles = ['../data_products/112923_n4_wks_lin_profiles_all2.pkl']
+    #listOfPickles = ['../data_products/delta/111523_n4_wks_128_profiles_all2.pkl']a
+    #listOfPickles = ['../data_products/121823_n4_onezone_wks_profiles_all2.pkl']
+    #listOfPickles = ['../data_products/122023_n4_wks_smth0.03_profiles_all2.pkl']
+    #listOfPickles = ['../data_products/011224_a0.9_profiles_all2.pkl']
+    #listOfPickles = ['../data_products/011123_gizmo_mhd_3d_uphi_profiles_all2.pkl']
+    #listOfPickles = ['../data_products/011424_n8_locff_smth0.03_profiles_all2.pkl']
+    #listOfPickles = ['../data_products/011224_hd_jitter_lin_profiles_all2.pkl']
+    listOfPickles = ["../data_products/012224_a0.1_movingrin_profiles_all2.pkl"]
+    #listOfPickles = ['../data_products/011924_n4_a0.5_profiles_all2.pkl']
 
-  # test
-  '''
-  #listOfPickles = ['../data_products/bondi_multizone_022723_jit0.3_new_coord_profiles_all2.pkl']
-  #listOfPickles = ['../data_products/bondi_multizone_030723_bondi_128^3_profiles_all2.pkl']
-  #listOfPickles = ['../data_products/production_runs/072823_beta01_128_profiles_all2.pkl']
-  #listOfPickles = ['../data_products/production_runs/072823_beta01_onezone_profiles_all2.pkl']
-  #listOfPickles = ['../data_products/082423_n4_profiles_all2.pkl']
-  #listOfPickles = ['../data_products/082423_n8_profiles_all2.pkl']
-  #listOfPickles = ['../data_products/100223_onezone_n4_profiles_all2.pkl']
-  #listOfPickles = ['../data_products/101123_gizmo_mhd_3d_profiles_all2.pkl'] # 3d
-  #listOfPickles = ['../data_products/101623_n4_cap_profiles_all2.pkl']
-  #listOfPickles = ['../data_products/101623_n4_locff_profiles_all2.pkl']
-  #listOfPickles = ['../data_products/102323_mhd_wks_profiles_all2.pkl']
-  #listOfPickles = ['../data_products/102323_n8_locff_profiles_all2.pkl']
-  #listOfPickles = ['../data_products/102423_n8_bondi_profiles_all2.pkl']
-  #listOfPickles = ['../data_products/102423_n4_incorrectrb_profiles_all2.pkl']
-  #listOfPickles = ['../data_products/103023_hd_jitter_profiles_all2.pkl']
-  #listOfPickles = ['../data_products/110223_mhd_mks_profiles_all2.pkl']
-  #listOfPickles = ['../data_products/110123_n4_reproduce_082423_profiles_all2.pkl']
-  #listOfPickles = ['../data_products/110723_n4_beta10_profiles_all2.pkl']
-  #listOfPickles = ['../data_products/110823_n4_moverin_profiles_all2.pkl']
-  #listOfPickles = ['../data_products/111023_n4_locff_profiles_all2.pkl']
-  listOfPickles = ['../data_products/111423_n4_wks_profiles_all2.pkl']
+    listOfLabels = None
+    plot_dir = "../plots/test"
+    cta=0 # time evolution
+    avg_frac=0.5
+    show_rscale=True
+    num_time_chunk=6 #8 #4 #2 #
+    boxcar_factor=0 #4 #2 #
+    colors=None
+    xlim=[2,2e8] #3e4] # 
+    show_div=True #False # temp
+    average_factor=2 #np.sqrt(2) #
 
-  listOfLabels = None
-  plot_dir = "../plots/test"
-  cta=0 # time evolution
-  avg_frac=0.5
-  show_rscale=True
-  num_time_chunk=6 #8 #4 #2 #
-  boxcar_factor=0 #4 #2 #
-  colors=None
-  xlim=[2,1e4] #2e8] # 
-  show_div=False # temp
-  '''
+    # colors, linestyles, directory
+    linestyles=['-','-','-','-','-','-','-','-','-', '--', ':']
+    os.makedirs(plot_dir, exist_ok=True)
 
-  # colors, linestyles, directory
-  linestyles=['-','-','-','-','-','-','-', '--', ':']
-  os.makedirs(plot_dir, exist_ok=True)
-
-  for quantity in ['b', 'K', 'eta', 'etaMdot', 'beta', 'Edot', 'Mdot', 'rho', 'u', 'T', 'abs_u^r', 'abs_u^phi', 'abs_u^th', 'u^r', 'u^phi',  'u^th']: #'abs_Omega', 'Pg', 
-    output = plot_dir+"/profile_"+quantity+".pdf"
-    #output = None
-    ylim = [None,[1e-4,10]][(quantity in ['Mdot'])] # [1e-3,10] if Mdot, None otherwise
-    ylim = [ylim,[1e-4,2]][(quantity in ['abs_Omega'])] #
-    ylim = [ylim,[1e-3,4e-1]][(quantity in ['eta'])] #
-    #ylim = [None,[1e-9,3e-1]][(quantity in ['rho'])]
-    plotProfiles(listOfPickles, quantity, output=output, zone_time_average_fraction=avg_frac, cycles_to_average=cta, color_list=colors, linestyle_list=linestyles, label_list=listOfLabels, rescale=False, \
-    show_init=0, trim_zone=True, flip_sign=(quantity in ['u^r']), xlim=xlim, ylim=ylim ,show_gizmo=("gizmo" in plot_dir), show_rscale=show_rscale, num_time_chunk=num_time_chunk, boxcar_factor=boxcar_factor, show_divisions=show_div, show_rb=show_rb, average_factor=2, tmax_list=tmax_list)#2130)# 2130 is when 20tB has passed for the HD run
+    for quantity in ['b', 'K', 'eta', 'etaMdot', 'beta', 'Edot', 'Mdot', 'rho', 'u', 'T', 'abs_u^r', 'abs_u^phi', 'abs_u^th', 'u^r', 'u^phi',  'u^th']: #'abs_Omega', 'Pg', 
+      output = plot_dir+"/profile_"+quantity+".pdf"
+      #output = None
+      ylim = [None,[1e-4,10]][(quantity in ['Mdot'])] # [1e-3,10] if Mdot, None otherwise
+      ylim = [ylim,[1e-4,2]][(quantity in ['abs_Omega'])] #
+      ylim = [ylim,[1e-3,4e-1]][(quantity in ['eta'])] #
+      #ylim = [ylim,[1e-3,4]][(quantity in ['eta'])] # non-zero spin
+      #ylim = [ylim,[1e-5,1e-1]][(quantity in ['eta'])] # HD + jitter
+      #ylim = [None,[1e-9,3e-1]][(quantity in ['rho'])]
+      plotProfiles(listOfPickles, quantity, output=output, zone_time_average_fraction=avg_frac, cycles_to_average=cta, color_list=colors, linestyle_list=linestyles, label_list=listOfLabels, rescale=False, \
+      show_init=0, trim_zone=True, flip_sign=(quantity in ['u^r']), xlim=xlim, ylim=ylim ,show_gizmo=("gizmo" in plot_dir), show_rscale=show_rscale, num_time_chunk=num_time_chunk, boxcar_factor=boxcar_factor, show_divisions=show_div, show_rb=show_rb, average_factor=average_factor, tmax_list=tmax_list)#2130)# 2130 is when 20tB has passed for the HD run
